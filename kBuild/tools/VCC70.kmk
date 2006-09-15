@@ -3,7 +3,7 @@
 #
 # kBuild Tool Config - Visual C++ 7.0 (aka Visual .NET)
 #
-# Copyright (c) 2004-2006 knut st. osmundsen <bird-srcspam@anduin.net>
+# Copyright (c) 2004 knut st. osmundsen <bird-srcspam@anduin.net>
 #
 #
 # This file is part of kBuild.
@@ -26,13 +26,8 @@
 
 
 TOOL_VCC70                    := Visual C++ 7.0
-ifndef PATH_TOOL_VCC70
-PATH_TOOL_VCC70               := $(wildcard $(PATH_DEV)/x86.win32/vcc/v7)
-ifeq ($(PATH_TOOL_VCC70),)
-PATH_TOOL_VCC70               := $(PATH_DEV)/x86.win32/vcc70
-endif
-endif
-PATH_TOOL_VCC70_LIB           ?= $(PATH_TOOL_VCC70)/lib
+PATH_TOOL_VCC70               ?= $(PATH_DEV)/x86.win32/vcc70
+PATH_TOOL_VCC70_LIB           ?= $(PATH_DEV)/x86.win32/vcc70/lib
 
 TOOL_VCC70_CC                 := $(EXEC_X86_WIN32) $(PATH_TOOL_VCC70)/bin/cl.exe
 TOOL_VCC70_COBJSUFF           := .obj
@@ -64,20 +59,6 @@ TOOL_VCC70_LDFLAGS            := -nologo
 TOOL_VCC70_LDFLAGS.debug      := -debug
 TOOL_VCC70_LDFLAGS.release    :=
 
-## Constructs the correct .pdb name (the name is lowercased).
-# @param    $(1)        Base name, no extention.
-# @param    $(2)        The extension.
-ifeq ($(filter tolower,$(KMK_FEATURES)),tolower)
-TOOL_VCC70_PDB                = $(dir $(1))$(tolower $(notdir $(1))).$(2)
-else # this fallback is incorrect and won't work on a case sensitive FS.
-TOOL_VCC70_PDB                = $(1).$(2)
-endif
-
-#ifeq ($(BUILD_PLATFORM),win32)
-VCC70_NEW_DEPS = 1
-#endif
-
-
 
 ## Compile C source.
 # @param    $(target)   Normalized main target name.
@@ -92,32 +73,23 @@ VCC70_NEW_DEPS = 1
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
 # @param    $(objsuff)  Object suffix.
-TOOL_VCC70_COMPILE_C_OUTPUT	= $(call TOOL_VCC70_PDB, $(outbase)-obj,pdb) $(call TOOL_VCC70_PDB, $(outbase)-obj,idb)
-TOOL_VCC70_COMPILE_C_DEPEND	=
-TOOL_VCC70_COMPILE_C_DEPORD =
-ifdef VCC70_NEW_DEPS
-define TOOL_VCC70_COMPILE_C_CMDS
+define TOOL_VCC70_COMPILE_C
+#$ (warning dbg: TOOL_VCC70_COMPILE_C: target=$(target) source=$(source) obj=$(obj) dep=$(dep) flags=$(flags) defs=$(defs) incs=$(incs) dirdep=$(dirdep) outbase=$(outbase) objsuff=$(objsuff))
+$(obj): $(source) $(deps) | $(dirdep)
+	$(call MSG_L2,Compiling $$@ using VCC70)
 	$(TOOL_VCC70_CC) -c\
 		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Fd$(outbase)-obj.pdb \
-		-FD\
+		-Fd$(outbase).pdb \
 		-Fo$(obj)\
 		$(subst /,\\,$(call ABSPATH,$(source)))
-	$(DEP_IDB) -f -s -o $(dep) -t $(obj) $(call TOOL_VCC70_PDB,$(outbase)-obj,idb)
+	$(DEP_CCXX) -q -f $(dep) -o $(obj) \
+		-D_M_IX86=500 -D_WIN32 -D_MSC_VER=1300 -D_MSC_EXTENSIONS=1 -D__COUNTER__=42 \
+		-D__DATE__=\"0000.00.00\" -D__FILE__=\"filename.c\" -D__LINE__=42 -D__TIME__=\"00.00.00\" -D__TIMESTAMP__=\"lotsofnumbers\" \
+		$(addprefix -D, $(defs)) $(addprefix -I, $(incs)) \
+		$(call ABSPATH,$(source))
+_OUT_FILES += $(outbase).pdb
+
 endef
-else
-define TOOL_VCC70_COMPILE_C_CMDS
-	$(TOOL_VCC70_CC) -c\
-		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Fd$(outbase)-obj.pdb \
-		-Fo$(obj)\
-		$(subst /,\\,$(call ABSPATH,$(source)))
-	$(TOOL_VCC70_CC) -E\
-		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		$(subst /,\\,$(call ABSPATH,$(source)))\
-		| $(DEP_PRE) -f -s -o $(dep) -t $(obj) -
-endef
-endif
 
 
 ## Compile C++ source.
@@ -133,56 +105,51 @@ endif
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
 # @param    $(objsuff)  Object suffix.
-TOOL_VCC70_COMPILE_CXX_OUTPUT = $(call TOOL_VCC70_PDB, $(outbase)-obj,pdb) $(call TOOL_VCC70_PDB, $(outbase)-obj,idb)
-TOOL_VCC70_COMPILE_CXX_DEPEND =
-TOOL_VCC70_COMPILE_CXX_DEPORD =
-ifdef VCC70_NEW_DEPS
-define TOOL_VCC70_COMPILE_CXX_CMDS
+define TOOL_VCC70_COMPILE_CXX
+#$ (warning dbg: TOOL_VCC70_COMPILE_CXX: target=$(target) source=$(source) obj=$(obj) dep=$(dep) flags=$(flags) defs=$(defs) incs=$(incs) dirdep=$(dirdep) outbase=$(outbase) objsuff=$(objsuff))
+$(obj): $(source) $(deps) | $(dirdep)
+	$(call MSG_L2,Compiling $$@ using VCC70)
 	$(TOOL_VCC70_CXX) -c\
 		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Fd$(outbase)-obj.pdb \
-		-FD\
+		-Fd$(outbase).pdb \
 		-Fo$(obj)\
 		$(subst /,\\,$(call ABSPATH,$(source)))
-	$(DEP_IDB) -f -s -o $(dep) -t $(obj) $(call TOOL_VCC70_PDB,$(outbase)-obj,idb)
+	$(DEP_CCXX) -q -f $(dep) -o $(obj) \
+		-D__cplusplus \
+		-D_M_IX86=500 -D_WIN32 -D_MSC_VER=1300 -D_MSC_EXTENSIONS=1 -D__COUNTER__=42 \
+		-D__DATE__=\"0000.00.00\" -D__FILE__=\"filename.c\" -D__LINE__=42 -D__TIME__=\"00.00.00\" -D__TIMESTAMP__=\"lotsofnumbers\" \
+		$(addprefix -D, $(defs)) $(addprefix -I, $(incs)) \
+		$(call ABSPATH,$(source))
+_OUT_FILES += $(outbase).pdb
+
 endef
-else
-define TOOL_VCC70_COMPILE_CXX_CMDS
-	$(TOOL_VCC70_CXX) -c\
-		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Fd$(outbase)-obj.pdb \
-		-Fo$(obj)\
-		$(subst /,\\,$(call ABSPATH,$(source)))
-	$(TOOL_VCC70_CXX) -E\
-		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		$(subst /,\\,$(call ABSPATH,$(source)))\
-		| $(DEP_PRE) -f -s -o $(dep) -t $(obj) -
-endef
-endif
 
 
 ## Link library
 # @param    $(target)   Normalized main target name.
-# @param    $(out)      Library name.
+# @param    $(lib)		Library name.
 # @param    $(objs)     Object files to put in the library.
 # @param    $(flags)    Flags.
 # @param    $(dirdep)   Directory creation dependency.
-# @param    $(deps)     Other dependencies.
+# @param    $(deps)		Other dependencies.
 # @param    $(othersrc) Unhandled sources.
-# @param    $(outbase)  Output basename (full). Use this for list files and such.
 #
-TOOL_VCC70_LINK_LIBRARY_OUTPUT = $(outbase).lst $(outbase).exp $(call TOOL_VCC70_PDB, $(outbase),pdb)
-TOOL_VCC70_LINK_LIBRARY_DEPEND = $(othersrc)
-TOOL_VCC70_LINK_LIBRARY_DEPORD =
-define TOOL_VCC70_LINK_LIBRARY_CMDS
-	$(TOOL_VCC70_AR) $(flags) /OUT:$(out) $(subst /,\\,$(objs) $(filter %.a %.lib,$(othersrc))) \
+# @param    $(outbase)  Output basename (full). Use this for list files and such.
+define TOOL_VCC70_LINK_LIBRARY
+#$ (warning dbg: TOOL_VCC70_LINK_LIBRARY: target=$(target) lib=$(lib) objs=$(objs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) outbase=$(outbase))
+$(lib): $(objs) $(deps) $(othersrc) | $(dirdep)
+	$(call MSG_L1,Creating Library $$@)
+	$(RM) -f $$@
+	$(TOOL_VCC70_AR) $(flags) /OUT:$(lib) $(subst /,\\,$(objs) $(filter %.a %.lib,$(othersrc))) \
 		$(foreach def,$(filter %.def,$(othersrc)), /DEF:$(def))
+_OUT_FILES += $(outbase).lst $(outbase).exp
+
 endef
 
 
 ## Link program
 # @param    $(target)       Normalized main target name.
-# @param    $(out)          Program name.
+# @param    $(exe)          Program name.
 # @param    $(objs)         Object files to link together.
 # @param    $(libs)         Libraries to search.
 # @param    $(libpath)      Library search paths.
@@ -192,46 +159,95 @@ endef
 # @param    $(othersrc)     Unhandled sources.
 # @param    $(custom_pre)   Custom step invoked before linking.
 # @param    $(custom_post)  Custom step invoked after linking.
-# @param    $(outbase)      Output basename (full). Use this for list files and such.
 #
-TOOL_VCC70_LINK_PROGRAM_OUTPUT = $(outbase).map $(outbase).lib $(outbase).exp $(call TOOL_VCC70_PDB, $(outbase),pdb) $(outbase).ilk
-TOOL_VCC70_LINK_PROGRAM_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(othersrc)
-TOOL_VCC70_LINK_PROGRAM_DEPORD =
-define TOOL_VCC70_LINK_PROGRAM_CMDS
+# @param    $(outbase)  Output basename (full). Use this for list files and such.
+define TOOL_VCC70_LINK_PROGRAM
+#$ (warning dbg: TOOL_VCC70_LINK_PROGRAM: target=$(target) exe=$(exe) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) othersrc=$(othersrc) outbase=$(outbase))
+$(exe): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) $(filter %.def,$(othersrc)) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
 	$(TOOL_VCC70_LD) $(flags) \
-		/OUT:$(out) \
-		/MAPINFO:EXPORTS /INCREMENTAL:NO /MAPINFO:LINES \
+		/OUT:$(exe) \
+		/MAPINFO:EXPORTS /MAPINFO:LINES \
 		/MAP:$(outbase).map \
 		$(foreach def,$(filter %.def,$(othersrc)), /DEF:$(def)) \
 		$(subst /,\\,$(filter %.exp %.res,$(othersrc))) \
 		$(foreach p,$(libpath), /LIBPATH:$(p)) \
 		$(subst /,\\,$(objs)) \
 		$(subst /,\\,$(libs))
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+_OUT_FILES += $(outbase).map $(outbase).lib $(outbase).exp $(outbase).pdb $(outbase).ilk
+
 endef
 
 
-## Link DLL.
-# @param    $(target)   Normalized main target name.
-# @param    $(out)      DLL name.
-# @param    $(objs)     Object files to link together.
-# @param    $(libs)     Libraries to search.
-# @param    $(libpath)  Library search paths.
-# @param    $(flags)    Flags.
-# @param    $(dirdep)   Directory creation dependency.
-# @param    $(deps)     Other dependencies.
+## Link system module (windows aka driver, linux aka kernel module)
+# @param    $(target)       Normalized main target name.
+# @param    $(sys)          System module name.
+# @param    $(objs)         Object files to link together.
+# @param    $(libs)         Libraries to search.
+# @param    $(libpath)      Library search paths.
+# @param    $(flags)        Flags.
+# @param    $(dirdep)       Directory creation dependency.
+# @param    $(deps)         Other dependencies.
 # @param    $(othersrc)     Unhandled sources.
 # @param    $(custom_pre)   Custom step invoked before linking.
 # @param    $(custom_post)  Custom step invoked after linking.
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_VCC70_LINK_DLL_OUTPUT = $(outbase).map $(outbase).lib $(outbase).exp $(call TOOL_VCC70_PDB, $(outbase),pdb) $(outbase).ilk
-TOOL_VCC70_LINK_DLL_DEPEND = $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(othersrc)
-TOOL_VCC70_LINK_DLL_DEPORD = $(call DIRDEP,$(PATH_LIB))
-define TOOL_VCC70_LINK_DLL_CMDS
+define TOOL_VCC70_LINK_SYSMOD
+#$ (warning dbg: TOOL_VCC70_LINK_SYSMOD: target=$(target) sys=$(sys) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) othersrc=$(othersrc) outbase=$(outbase))
+$(sys): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) $(filter %.def %.exp %.res,$(othersrc)) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
 	$(TOOL_VCC70_LD) $(flags) \
-		/OUT:$(out) \
+		/OUT:$(sys) \
+		/MAPINFO:EXPORTS /MAPINFO:LINES \
+		/MAP:$(outbase).map \
+		$(foreach def,$(filter %.def,$(othersrc)), /DEF:$(def)) \
+		$(subst /,\\,$(filter %.exp %.res,$(othersrc))) \
+		$(foreach p,$(libpath), /LIBPATH:$(p)) \
+		$(subst /,\\,$(objs)) \
+		$(subst /,\\,$(libs))
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+_OUT_FILES += $(outbase).map $(outbase).lib $(outbase).exp $(outbase).pdb $(outbase).ilk
+
+endef
+
+
+## Link system module (windows aka driver, linux aka kernel module)
+# @param    $(target)   Normalized main target name.
+# @param    $(dll)		System module name.
+# @param    $(objs)     Object files to link together.
+# @param    $(libs)     Libraries to search.
+# @param    $(libpath)  Library search paths.
+# @param    $(flags)    Flags.
+# @param    $(dirdep)   Directory creation dependency.
+# @param    $(deps)		Other dependencies.
+# @param    $(othersrc) Unhandled sources.
+# @param    $(custom_pre)   Custom step invoked before linking.
+# @param    $(custom_post)  Custom step invoked after linking.
+#
+# @param    $(outbase)  Output basename (full). Use this for list files and such.
+define TOOL_VCC70_LINK_DLL
+#$ (warning dbg: TOOL_VCC70_LINK_DLL: target=$(target) dll=$(dll) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) othersrc=$(othersrc) outbase=$(outbase))
+$(dll): $(call DIRDEP,$(PATH_LIB)) $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) $(filter %.def %.exp %.res,$(othersrc)) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
+	$(TOOL_VCC70_LD) $(flags) \
+		/OUT:$(dll) \
 		/IMPLIB:$(outbase).lib \
-		/MAPINFO:EXPORTS /INCREMENTAL:NO /MAPINFO:LINES \
+		/MAPINFO:EXPORTS /MAPINFO:LINES \
 		/MAP:$(outbase).map \
 		/DLL \
 		$(foreach def,$(filter %.def,$(othersrc)), /DEF:$(def)) \
@@ -243,36 +259,10 @@ ifeq ($(filter %.exp .def,$(othersrc)),)
 	if test -f $(outbase).exp; then $(CP_EXT) $(outbase).exp $(PATH_LIB)/; fi
 	if test -f $(outbase).lib; then $(CP_EXT) $(outbase).lib $(PATH_LIB)/; fi
 endif
-$(eval _DIRS += $(PATH_LIB))
-endef
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+_OUT_FILES += $(outbase).map $(outbase).lib $(outbase).exp $(outbase).pdb $(outbase).ilk
 
-
-## Link system module (windows aka driver, linux aka kernel module)
-# @param    $(target)       Normalized main target name.
-# @param    $(out)          System module name.
-# @param    $(objs)         Object files to link together.
-# @param    $(libs)         Libraries to search.
-# @param    $(libpath)      Library search paths.
-# @param    $(flags)        Flags.
-# @param    $(dirdep)       Directory creation dependency.
-# @param    $(deps)         Other dependencies.
-# @param    $(othersrc)     Unhandled sources.
-# @param    $(custom_pre)   Custom step invoked before linking.
-# @param    $(custom_post)  Custom step invoked after linking.
-#
-# @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_VCC70_LINK_SYSMOD_OUTPUT = $(outbase).map $(outbase).lib $(outbase).exp $(call TOOL_VCC70_PDB, $(outbase),pdb) $(outbase).ilk
-TOOL_VCC70_LINK_SYSMOD_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(othersrc)
-TOOL_VCC70_LINK_SYSMOD_DEPORD =
-define TOOL_VCC70_LINK_SYSMOD_CMDS
-	$(TOOL_VCC70_LD) $(flags) \
-		/OUT:$(out) \
-		/MAPINFO:EXPORTS /INCREMENTAL:NO /MAPINFO:LINES \
-		/MAP:$(outbase).map \
-		$(foreach def,$(filter %.def,$(othersrc)), /DEF:$(def)) \
-		$(subst /,\\,$(filter %.exp %.res,$(othersrc))) \
-		$(foreach p,$(libpath), /LIBPATH:$(p)) \
-		$(subst /,\\,$(objs)) \
-		$(subst /,\\,$(libs))
 endef
 

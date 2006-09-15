@@ -3,7 +3,7 @@
 #
 # kBuild Tool Config - Generic GCC.
 #
-# Copyright (c) 2004-2005 knut st. osmundsen <bird-srcspam@anduin.net>
+# Copyright (c) 2004 knut st. osmundsen <bird-srcspam@anduin.net>
 #
 #
 # This file is part of kBuild.
@@ -46,8 +46,7 @@ TOOL_GCC_CXXFLAGS.profile   := -O2 #-pg
 TOOL_GCC_CXXINCS            :=
 TOOL_GCC_CXXDEFS            :=
 
-TOOL_GCC_AS                 := gcc$(HOSTSUFF_EXE)
-TOOL_GCC_ASFLAGS            := -g -x assembler-with-cpp
+TOOL_GCC_AS                 := as$(HOSTSUFF_EXE)
 TOOL_GCC_ASOBJSUFF          := .o
 
 TOOL_GCC_AR                 := ar$(HOSTSUFF_EXE)
@@ -76,18 +75,19 @@ endif
 # @param    $(incs)     Includes. No -I or something.
 # @param    $(dirdep)   Directory creation dependency.
 # @param    $(deps)		Other dependencies.
+#
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
 # @param    $(objsuff)  Object suffix.
-#
-TOOL_GCC_COMPILE_C_OUTPUT =
-TOOL_GCC_COMPILE_C_DEPEND =
-TOOL_GCC_COMPILE_C_DEPORD =
-define TOOL_GCC_COMPILE_C_CMDS
+define TOOL_GCC_COMPILE_C
+#$ (warning dbg: TOOL_GCC_COMPILE_C: target=$(target) source=$(source) obj=$(obj) dep=$(dep) flags=$(flags) defs=$(defs) incs=$(incs) dirdep=$(dirdep) outbase=$(outbase) objsuff=$(objsuff) deps=$(deps))
+$(obj): $(PATH_CURRENT)/$(source) $(deps) | $(dirdep)
+	$(call MSG_L2,Compiling $$@ using GCC)
 	$(TOOL_GCC_CC) -c\
 		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Wp,-MD,$(dep) -Wp,-MT,$(out) \
-		-o $(out)\
+		-Wp,-MD,$(dep) -Wp,-MT,$$@ \
+		-o $$@\
 		$(call ABSPATH,$(source))
+
 endef
 
 
@@ -104,63 +104,41 @@ endef
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
 # @param    $(objsuff)  Object suffix.
-TOOL_GCC_COMPILE_CXX_OUTPUT =
-TOOL_GCC_COMPILE_CXX_DEPEND =
-TOOL_GCC_COMPILE_CXX_DEPORD =
-define TOOL_GCC_COMPILE_CXX_CMDS
+define TOOL_GCC_COMPILE_CXX
+#$ (warning dbg: TOOL_GCC_COMPILE_CXX: target=$(target) source=$(source) obj=$(obj) dep=$(dep) flags=$(flags) defs=$(defs) incs=$(incs) dirdep=$(dirdep) outbase=$(outbase) objsuff=$(objsuff) deps=$(deps))
+$(obj): $(source) $(deps) | $(dirdep)
+	$(call MSG_L2,Compiling $$@ using GCC)
 	$(TOOL_GCC_CXX) -c\
 		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Wp,-MD,$(dep) -Wp,-MT,$(out) \
-		-o $(out)\
+		-Wp,-MD,$(dep) -Wp,-MT,$$@ \
+		-o $$@\
 		$(call ABSPATH,$(source))
-endef
 
-
-## Compile Assembly source.
-# @param    $(target)   Normalized main target name.
-# @param    $(source)   Source filename (relative).
-# @param    $(obj)      Object file name. This shall be (re)created by the compilation.
-# @param    $(dep)      Dependcy file. This shall be (re)created by the compilation.
-# @param    $(flags)    Flags.
-# @param    $(defs)     Definitions. No -D or something.
-# @param    $(incs)     Includes. No -I or something.
-# @param    $(dirdep)   Directory creation dependency.
-# @param    $(deps)     Other dependencies.
-# @param    $(outbase)  Output basename (full). Use this for list files and such.
-# @param    $(objsuff)  Object suffix.
-#
-TOOL_GCC_COMPILE_AS_OUTPUT =
-TOOL_GCC_COMPILE_AS_DEPEND =
-TOOL_GCC_COMPILE_AS_DEPORD =
-define TOOL_GCC_COMPILE_AS_CMDS
-	$(TOOL_GCC_AS) -c\
-		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Wp,-MD,$(dep) -Wp,-MT,$(out) \
-		-o $(out)\
-		$(call ABSPATH,$(source))
 endef
 
 
 ## Link library
 # @param    $(target)   Normalized main target name.
-# @param    $(out)      Library name.
+# @param    $(lib)		Library name.
 # @param    $(objs)     Object files to put in the library.
 # @param    $(flags)    Flags.
 # @param    $(dirdep)   Directory creation dependency.
 # @param    $(deps)		Other dependencies.
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_GCC_LINK_LIBRARY_OUTPUT =
-TOOL_GCC_LINK_LIBRARY_DEPEND =
-TOOL_GCC_LINK_LIBRARY_DEPORD =
-define TOOL_GCC_LINK_LIBRARY_CMDS
-	$(TOOL_GCC_AR) $(flags) $(out) $(objs)
+define TOOL_GCC_LINK_LIBRARY
+#$ (warning dbg: TOOL_GCC_LINK_LIBRARY: target=$(target) lib=$(lib) objs=$(objs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) outbase=$(outbase))
+$(lib): $(objs) $(deps) | $(dirdep)
+	$(call MSG_L1,Creating Library $$@)
+	$(RM) -f $$@
+	$(TOOL_GCC_AR) $(flags) $$@ $(objs)
+
 endef
 
 
 ## Link program
 # @param    $(target)   Normalized main target name.
-# @param    $(out)		Program name.
+# @param    $(exe)		Program name.
 # @param    $(objs)     Object files to link together.
 # @param    $(libs)     Libraries to search.
 # @param    $(libpath)  Library search paths.
@@ -172,18 +150,25 @@ endef
 # @param    $(custom_post)  Custom step invoked after linking.
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_GCC_LINK_PROGRAM_OUTPUT =
-TOOL_GCC_LINK_PROGRAM_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib)))
-TOOL_GCC_LINK_PROGRAM_DEPORD =
-define TOOL_GCC_LINK_PROGRAM_CMDS
-	$(TOOL_GCC_LD) $(flags) -o $(out) $(objs) \
-		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))
+define TOOL_GCC_LINK_PROGRAM
+#$ (warning dbg: TOOL_GCC_LINK_PROGRAM: target=$(target) exe=$(exe) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) deffile=$(deffile) outbase=$(outbase))
+$(exe): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
+	$(TOOL_GCC_LD) $(flags) -o $$@ $(objs) \
+	$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+
 endef
 
 
-## Link DLL
+## Link program
 # @param    $(target)   Normalized main target name.
-# @param    $(out)		Program name.
+# @param    $(exe)		Program name.
 # @param    $(objs)     Object files to link together.
 # @param    $(libs)     Libraries to search.
 # @param    $(libpath)  Library search paths.
@@ -193,12 +178,20 @@ endef
 # @param    $(othersrc) Unhandled sources.
 # @param    $(custom_pre)   Custom step invoked before linking.
 # @param    $(custom_post)  Custom step invoked after linking.
-# @param    $(outbase)      Output basename (full). Use this for list files and such.
-TOOL_GCC_LINK_DLL_OUTPUT =
-TOOL_GCC_LINK_DLL_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib)))
-TOOL_GCC_LINK_DLL_DEPORD =
-define TOOL_GCC_LINK_DLL_CMDS
-	$(TOOL_GCC_LD) $(TOOL_GCC_LDFLAGS.dll) $(flags) -o $(out) $(objs) \
-		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))
+#
+# @param    $(outbase)  Output basename (full). Use this for list files and such.
+define TOOL_GCC_LINK_DLL
+#$ (warning dbg: TOOL_GCC_LINK_DLL: target=$(target) exe=$(exe) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) deffile=$(deffile) outbase=$(outbase))
+$(exe): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
+	$(TOOL_GCC_LD) $(TOOL_GCC_LDFLAGS.dll) $(flags) -o $$@ $(objs) \
+	$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+
 endef
 

@@ -1,7 +1,0 @@
-# $Id$
-
-SUBDIRS = src
-
-DEPTH = .
-include $(PATH_KBUILD)/rules.kmk
-

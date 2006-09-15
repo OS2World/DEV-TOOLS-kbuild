@@ -3,7 +3,7 @@
 #
 # kBuild Tool Config - Generic GCC.
 #
-# Copyright (c) 2004-2005 knut st. osmundsen <bird-srcspam@anduin.net>
+# Copyright (c) 2004 knut st. osmundsen <bird-srcspam@anduin.net>
 #
 #
 # This file is part of kBuild.
@@ -45,19 +45,12 @@ TOOL_GCC3_CXXFLAGS.profile   := -O2 #-pg
 TOOL_GCC3_CXXINCS            :=
 TOOL_GCC3_CXXDEFS            :=
 
-TOOL_GCC3_AS                 := gcc$(HOSTSUFF_EXE)
-TOOL_GCC3_ASFLAGS            := -g -x assembler-with-cpp
+TOOL_GCC3_AS                 := as$(HOSTSUFF_EXE)
 TOOL_GCC3_ASOBJSUFF          := .o
 
 TOOL_GCC3_AR                 := ar$(HOSTSUFF_EXE)
 TOOL_GCC3_ARFLAGS            := cr
 TOOL_GCC3_ARLIBSUFF          := .a
-
-ifeq ($(BUILD_TARGET),os2)
-TOOL_GCC3_AR_IMP             := emximp$(HOSTSTUFF_EXE)
-else
-TOOL_GCC3_AR_IMP             := $(ECHO) not supported!
-endif
 
 TOOL_GCC3_LD                 := g++$(HOSTSUFF_EXE)
 TOOL_GCC3_LD_SYSMOD          := ld$(HOSTSUFF_EXE)
@@ -72,12 +65,12 @@ endif
 TOOL_GCC3_LDFLAGS.sysmod     := -r
 TOOL_GCC3_LD_SONAME           = -Wl,-soname=$(firstword $($(1)_SONAME.$(BUILD_TARGET).$(BUILD_TYPE)) $($(1)_SONAME.$(BUILD_TARGET)) $($(1)_SONAME.$(BUILD_TYPE)) $($(1)_SONAME) $(notdir $(2)))
 ifeq ($(BUILD_TARGET),os2)
-TOOL_GCC3_LD_MAP              = -Zmap=$(1)
+TOOL_GCC3_LD_MAP              = -Zmap $(1)
 else
 TOOL_GCC3_LD_MAP              = -Wl,-Map -Wl,$(1) -Wl,--cref
 endif
 ifeq ($(BUILD_TARGET),os2)
-TOOL_GCC3_LD_SYSMOD_MAP       = -Zmap=$(1)
+TOOL_GCC3_LD_SYSMOD_MAP       = -Zmap $(1)
 else
 TOOL_GCC3_LD_SYSMOD_MAP       = -Map $(1) --cref
 endif
@@ -100,15 +93,16 @@ endif
 #
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
 # @param    $(objsuff)  Object suffix.
-TOOL_GCC3_COMPILE_C_OUTPUT =
-TOOL_GCC3_COMPILE_C_DEPEND =
-TOOL_GCC3_COMPILE_C_DEPORD =
-define TOOL_GCC3_COMPILE_C_CMDS
+define TOOL_GCC3_COMPILE_C
+#$ (warning dbg: TOOL_GCC3_COMPILE_C: target=$(target) source=$(source) obj=$(obj) dep=$(dep) flags=$(flags) defs=$(defs) incs=$(incs) dirdep=$(dirdep) outbase=$(outbase) objsuff=$(objsuff))
+$(obj): $(source) $(deps) | $(dirdep)
+	$(call MSG_L2,Compiling $$@ using GCC3)
 	$(TOOL_GCC3_CC) -c\
 		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Wp,-MD,$(dep) -Wp,-MT,$(obj) -Wp,-MP\
-		-o $(obj)\
+		-Wp,-MD,$(dep) -Wp,-MT,$$@ \
+		-o $$@\
 		$(call ABSPATH,$(source))
+
 endef
 
 
@@ -122,75 +116,68 @@ endef
 # @param    $(incs)     Includes. No -I or something.
 # @param    $(dirdep)   Directory creation dependency.
 # @param    $(deps)		Other dependencies.
+#
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
 # @param    $(objsuff)  Object suffix.
-TOOL_GCC3_COMPILE_CXX_OUTPUT =
-TOOL_GCC3_COMPILE_CXX_DEPEND =
-TOOL_GCC3_COMPILE_CXX_DEPORD =
-define TOOL_GCC3_COMPILE_CXX_CMDS
+define TOOL_GCC3_COMPILE_CXX
+#$ (warning dbg: TOOL_GCC3_COMPILE_CXX: target=$(target) source=$(source) obj=$(obj) dep=$(dep) flags=$(flags) defs=$(defs) incs=$(incs) dirdep=$(dirdep) outbase=$(outbase) objsuff=$(objsuff))
+$(obj): $(source) $(deps) | $(dirdep)
+	$(call MSG_L2,Compiling $$@ using GCC3)
 	$(TOOL_GCC3_CXX) -c\
 		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Wp,-MD,$(dep) -Wp,-MT,$(obj) -Wp,-MP\
-		-o $(obj)\
+		-Wp,-MD,$(dep) -Wp,-MT,$$@ \
+		-o $$@\
 		$(call ABSPATH,$(source))
-endef
 
-
-## Compile Assembly source.
-# @param    $(target)   Normalized main target name.
-# @param    $(source)   Source filename (relative).
-# @param    $(obj)      Object file name. This shall be (re)created by the compilation.
-# @param    $(dep)      Dependcy file. This shall be (re)created by the compilation.
-# @param    $(flags)    Flags.
-# @param    $(defs)     Definitions. No -D or something.
-# @param    $(incs)     Includes. No -I or something.
-# @param    $(dirdep)   Directory creation dependency.
-# @param    $(deps)     Other dependencies.
-# @param    $(outbase)  Output basename (full). Use this for list files and such.
-# @param    $(objsuff)  Object suffix.
-#
-TOOL_GCC3_COMPILE_AS_OUTPUT =
-TOOL_GCC3_COMPILE_AS_DEPEND =
-TOOL_GCC3_COMPILE_AS_DEPORD =
-define TOOL_GCC3_COMPILE_AS_CMDS
-	$(TOOL_GCC3_AS) -c\
-		$(flags) $(addprefix -I, $(incs)) $(addprefix -D, $(defs))\
-		-Wp,-MD,$(dep) -Wp,-MT,$(obj) -Wp,-MP\
-		-o $(obj)\
-		$(call ABSPATH,$(source))
 endef
 
 
 ## Link library
 # @param    $(target)   Normalized main target name.
-# @param    $(out)		Library name.
+# @param    $(lib)		Library name.
 # @param    $(objs)     Object files to put in the library.
 # @param    $(flags)    Flags.
 # @param    $(dirdep)   Directory creation dependency.
 # @param    $(deps)		Other dependencies.
 # @param    $(othersrc) Unhandled sources.
+#
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_GCC3_LINK_LIBRARY_OUTPUT = $(out).ar-script
-TOOL_GCC3_LINK_LIBRARY_DEPEND = $(filter %.a %.lib %.def %.imp,$(othersrc))
-TOOL_GCC3_LINK_LIBRARY_DEPORD =
-define TOOL_GCC3_LINK_LIBRARY_CMDS
-	$(APPEND) $(out).ar-script "CREATE $(out)"
-	$(foreach o, $(objs)\
-		,$(NL)$(TAB)$(APPEND) $(out).ar-script "ADDMOD $(o)")
-	$(foreach srclib, $(filter %.a %.lib,$(othersrc))\
-		,$(NL)$(TAB)$(APPEND) $(out).ar-script "ADDLIB $(srclib)")
-	$(if $(filter %.def %.imp,$(othersrc))\
-		,$(TOOL_GCC3_AR_IMP) -o $(outbase).imp.a $(filter %.def %.imp,$(othersrc))\
-		 $(NL)$(TAB)$(APPEND) $(out).ar-script "ADDLIB $(outbase).imp.a")
-	$(APPEND) $(out).ar-script "SAVE"
-	$(APPEND) $(out).ar-script "END"
-	$(TOOL_GCC3_AR) -M < $(out).ar-script
+
+define TOOL_GCC3_LINK_LIBRARY_ADDMOD
+
+	echo "ADDMOD $(o)" >> $$@.ar-script
+endef
+
+define TOOL_GCC3_LINK_LIBRARY_EXPAND_LIB
+
+	$(MKDIR) -p $(dir $(outbase))ar.extract/$(notdir $(srclib))
+	cd $(dir $(outbase))ar.extract/$(notdir $(srclib)) && $(TOOL_GCC3_AR) x $(srclib)
+	for o in `$(TOOL_GCC3_AR) t $(srclib)`; do echo "ADDMOD $(dir $(outbase))ar.extract/$(notdir $(srclib))/$$$${o}" >> $$@.ar-script; done
+endef
+
+define TOOL_GCC3_LINK_LIBRARY
+#$ (warning dbg: TOOL_GCC3_LINK_LIBRARY: target=$(target) lib=$(lib) objs=$(objs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) othersrc=$(othersrc) outbase=$(outbase))
+$(lib): $(objs) $(deps) $(filter %.a %.lib,$(othersrc)) | $(dirdep)
+	$(call MSG_L1,Creating Library $$@)
+	$(RM) -f $$@
+ifneq ($(strip $(filter %.a %.lib,$(othersrc))),)
+	echo "CREATE $$@" > $$@.ar-script
+	$(foreach o, $(objs),$(TOOL_GCC3_LINK_LIBRARY_ADDMOD))
+	$(foreach srclib, $(filter %.a %.lib,$(othersrc)),$(TOOL_GCC3_LINK_LIBRARY_EXPAND_LIB))
+	echo "SAVE" >> $$@.ar-script
+	echo "END" >> $$@.ar-script
+	$(TOOL_GCC3_AR) -M < $$@.ar-script
+	$(RM) -Rf "$(dir $(outbase))ar.extract/"
+else
+	$(TOOL_GCC3_AR) $(flags) $$@ $(objs)
+endif
+
 endef
 
 
 ## Link program
 # @param    $(target)   Normalized main target name.
-# @param    $(out)		Program name.
+# @param    $(exe)		Program name.
 # @param    $(objs)     Object files to link together.
 # @param    $(libs)     Libraries to search.
 # @param    $(libpath)  Library search paths.
@@ -200,21 +187,31 @@ endef
 # @param    $(othersrc) Unhandled sources.
 # @param    $(custom_pre)   Custom step invoked before linking.
 # @param    $(custom_post)  Custom step invoked after linking.
+#
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_GCC3_LINK_PROGRAM_OUTPUT = $(outbase).map
-TOOL_GCC3_LINK_PROGRAM_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib)))
-TOOL_GCC3_LINK_PROGRAM_DEPORD =
-define TOOL_GCC3_LINK_PROGRAM_CMDS
-	$(TOOL_GCC3_LD) $(flags) -o $(out) $(objs)\
-		$(foreach p,$(libpath), -L$(p))\
-		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))\
+define TOOL_GCC3_LINK_PROGRAM
+#$ (warning dbg: TOOL_GCC3_LINK_PROGRAM: target=$(target) exe=$(exe) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) deffile=$(deffile) outbase=$(outbase))
+$(exe): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
+	$(RM) -f $$@
+	$(TOOL_GCC3_LD) $(flags) -o $$@ $(objs) \
+		$(foreach p,$(libpath), -L$(p)) \
+		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib))) \
 		$(call TOOL_GCC3_LD_MAP,$(outbase).map)
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+_OUT_FILES += $(outbase).map
+
 endef
 
 
 ## Link DLL
 # @param    $(target)   Normalized main target name.
-# @param    $(out)		Program name.
+# @param    $(dll)		Program name.
 # @param    $(objs)     Object files to link together.
 # @param    $(libs)     Libraries to search.
 # @param    $(libpath)  Library search paths.
@@ -224,23 +221,32 @@ endef
 # @param    $(othersrc) Unhandled sources.
 # @param    $(custom_pre)   Custom step invoked before linking.
 # @param    $(custom_post)  Custom step invoked after linking.
+#
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_GCC3_LINK_DLL_OUTPUT = $(outbase).map
-TOOL_GCC3_LINK_DLL_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib)))
-TOOL_GCC3_LINK_DLL_DEPORD =
-define TOOL_GCC3_LINK_DLL_CMDS
-	$(TOOL_GCC3_LD) $(TOOL_GCC3_LDFLAGS.dll) $(flags) -o $(out)\
-		$(if $(filter-out win32 os2, $(BUILD_TARGET)),$(call TOOL_GCC3_LD_SONAME,$(target),$(out)))\
-		$(objs)\
-		$(foreach p,$(libpath), -L$(p))\
-		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))\
+define TOOL_GCC3_LINK_DLL
+#$ (warning dbg: TOOL_GCC3_LINK_PROGRAM: target=$(target) dll=$(dll) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) deffile=$(deffile) outbase=$(outbase))
+$(dll): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
+	$(RM) -f $$@
+	$(TOOL_GCC3_LD) $(TOOL_GCC3_LDFLAGS.dll) $(flags) -o $$@ \
+		$(if $(filter linux, $(BUILD_TARGET)),$(call TOOL_GCC3_LD_SONAME,$(target),$(dll))) \
+		$(objs) \
+		$(foreach p,$(libpath), -L$(p)) \
+		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib))) \
 		$(call TOOL_GCC3_LD_MAP,$(outbase).map)
-endef
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+_OUT_FILES += $(outbase).map
 
+endef
 
 ## Link system module (windows aka driver, linux aka kernel module)
 # @param    $(target)   Normalized main target name.
-# @param    $(out)		System module name.
+# @param    $(sys)		System module name.
 # @param    $(objs)     Object files to link together.
 # @param    $(libs)     Libraries to search.
 # @param    $(libpath)  Library search paths.
@@ -250,14 +256,24 @@ endef
 # @param    $(othersrc) Unhandled sources.
 # @param    $(custom_pre)   Custom step invoked before linking.
 # @param    $(custom_post)  Custom step invoked after linking.
+#
 # @param    $(outbase)  Output basename (full). Use this for list files and such.
-TOOL_GCC3_LINK_SYSMOD_OUTPUT = $(outbase).map
-TOOL_GCC3_LINK_SYSMOD_DEPEND = $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib)))
-TOOL_GCC3_LINK_SYSMOD_DEPORD =
-define TOOL_GCC3_LINK_SYSMOD_CMDS
-	$(TOOL_GCC3_LD_SYSMOD) $(TOOL_GCC3_LDFLAGS.sysmod) $(flags) -o $(out) $(objs)\
-		$(foreach p,$(libpath), -L$(p))\
-		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib)))\
+define TOOL_GCC3_LINK_SYSMOD
+#$ (warning dbg: TOOL_GCC3_LINK_SYSMOD: target=$(target) sys=$(sys) objs=$(objs) libs=$(libs) deps=$(deps) flags=$(flags) dirdep=$(dirdep) othersrc=$(othersrc) outbase=$(outbase))
+$(sys): $(objs) $(foreach lib,$(libs),$(if $(findstring $(lib),$(subst /,x,$(lib))),, $(lib))) $(deps) | $(dirdep)
+	$(call MSG_L1,Creating Program $$@)
+ifneq ($(custom_pre),)
+	$(eval $(custom_pre))
+endif
+	$(RM) -f $$@
+	$(TOOL_GCC3_LD_SYSMOD) $(TOOL_GCC3_LDFLAGS.sysmod) $(flags) -o $$@ $(objs) \
+		$(foreach p,$(libpath), -L$(p)) \
+		$(foreach lib,$(libs), $(if $(findstring $(lib),$(subst /,x,$(lib))), -l$(patsubst lib%,%,$(basename $(lib))), $(lib))) \
 		$(call TOOL_GCC3_LD_SYSMOD_MAP,$(outbase).map)
+ifneq ($(custom_post),)
+	$(eval $(custom_post))
+endif
+_OUT_FILES += $(outbase).map
+
 endef
 
