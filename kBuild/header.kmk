@@ -33,11 +33,6 @@ ifndef __header_kmk__
 all: all_recursive
 
 #
-# The FORCE rule.
-#
-FORCE:
-
-#
 # Try avoid inference rules.
 #
 .SUFFIXES:
@@ -53,28 +48,6 @@ SUFFIXES :=
 # @param    $1	Word list.
 lastword = $(word $(words $(1)), $(1))
 
-##
-# Newline character(s).
-define NL
-
-
-endef
-
-##
-# Tab character.
-TAB := $(subst .,	,.)
-
-##
-# Space character.
-SP := $(subst ., ,.)
-
-##
-# Checks if two strings are equal.
-# @returns	blank if equal
-# @returns	non-blank if not equal.
-# @param    $1   String 1.
-# @param    $2   String 2
-STRCMP = $( todo )
 
 #
 # Assert build type.
@@ -99,33 +72,57 @@ endif
 #
 # Assert build platform.
 #
-ifndef BUILD_PLATFORM
- $(error kBuild: BUILD_PLATFORM is undefined!)
-else
- BUILD_PLATFORM     := $(strip $(BUILD_PLATFORM))
- ifneq ($(words $(BUILD_PLATFORM))$(filter-out freebsd l4 linux nt os2 win win32 win64,$(BUILD_PLATFORM)),1)
-  # OS/2 (have uppercase legacy)
-  ifeq ($(BUILD_PLATFORM),OS2)
-   $(error kBuild: BUILD_PLATFORM must be all lowercase!)
-  endif
-  $(error kBuild: BUILD_PLATFORM value '$(BUILD_PLATFORM)' was not recognized!)
- endif
+_BUILD_PLATFORM_OK  := 0
+# OS/2 (have uppercase legacy)
+ifeq ($(BUILD_PLATFORM),OS2)
+override BUILD_PLATFORM := os2
+endif
+ifeq ($(BUILD_PLATFORM),os2)
+_BUILD_PLATFORM_OK  := 1
+endif
+
+# Linux
+ifeq ($(BUILD_PLATFORM),LINUX)
+$(error kBuild: BUILD_PLATFORM must be all lowercase!)
+endif
+ifeq ($(BUILD_PLATFORM),linux)
+_BUILD_PLATFORM_OK  := 1
+endif
+
+# Win32
+ifeq ($(BUILD_PLATFORM),WIN32)
+$(error kBuild: BUILD_PLATFORM must be all lowercase!)
+endif
+ifeq ($(BUILD_PLATFORM),win32)
+_BUILD_PLATFORM_OK  := 1
+endif
+
+# L4
+ifeq ($(BUILD_PLATFORM),L4)
+$(error kBuild: BUILD_PLATFORM must be all lowercase!)
+endif
+ifeq ($(BUILD_PLATFORM),l4)
+_BUILD_PLATFORM_OK  := 1
+endif
+
+# FreeBSD
+ifeq ($(BUILD_PLATFORM),FreeBSD)
+$(error kBuild: BUILD_PLATFORM must be all lowercase!)
+endif
+ifeq ($(BUILD_PLATFORM),freebsd)
+_BUILD_PLATFORM_OK  := 1
+endif
+
+ifeq ($(_BUILD_PLATFORM_OK),0)
+$(error kBuild: BUILD_PLATFORM value '$(BUILD_PLATFORM)' was not recongized!)
 endif
 
 # Fill in defaults if needed.
 ifndef BUILD_PLATFORM_ARCH
- ifeq ($(filter-out win64,$(BUILD_PLATFORM)),)
-  BUILD_PLATFORM_ARCH := amd64
- else
-  BUILD_PLATFORM_ARCH := x86
- endif
+BUILD_PLATFORM_ARCH   := x86
 endif
 ifndef BUILD_PLATFORM_CPU
- ifeq ($(filter-out amd64,$(BUILD_PLATFORM_ARCH)),)
-  BUILD_PLATFORM_CPU:= k8
- else
-  BUILD_PLATFORM_CPU:= i586
- endif
+BUILD_PLATFORM_CPU    := i586
 endif
 
 
@@ -136,22 +133,58 @@ ifndef BUILD_TARGET
 # not defined, set to the same as build platform
 BUILD_TARGET        := $(BUILD_PLATFORM)
 else
- BUILD_TARGET       := $(strip $(BUILD_TARGET))
- ifneq ($(words $(BUILD_TARGET))$(filter-out freebsd l4 linux nt os2 win win32 win64,$(BUILD_TARGET)),1)
-  # OS/2 (have uppercase legacy)
-  ifeq ($(BUILD_TARGET),OS2)
-   $(error kBuild: BUILD_TARGET must be all lowercase!)
-  endif
-  $(error kBuild: BUILD_TARGET value '$(BUILD_TARGET)' was not recognized!)
- endif
+_BUILD_TARGET_OK    := 0
+# OS/2
+ifeq ($(BUILD_TARGET),OS2)
+$(error kBuild: BUILD_TARGET must be all lowercase!)
+endif
+ifeq ($(BUILD_TARGET),os2)
+_BUILD_TARGET_OK    := 1
+endif
+
+# Linux
+ifeq ($(BUILD_TARGET),LINUX)
+$(error kBuild: BUILD_TARGET must be all lowercase!)
+endif
+ifeq ($(BUILD_TARGET),linux)
+_BUILD_TARGET_OK    := 1
+endif
+
+# Win32
+ifeq ($(BUILD_TARGET),WIN32)
+$(error kBuild: BUILD_TARGET must be all lowercase!)
+endif
+ifeq ($(BUILD_TARGET),win32)
+_BUILD_TARGET_OK    := 1
+endif
+
+# L4
+ifeq ($(BUILD_TARGET),L4)
+$(error kBuild: BUILD_TARGET must be all lowercase!)
+endif
+ifeq ($(BUILD_TARGET),l4)
+_BUILD_TARGET_OK    := 1
+endif
+
+# FreeBSD
+ifeq ($(BUILD_TARGET),FreeBSD)
+$(error kBuild: BUILD_TARGET must be all lowercase!)
+endif
+ifeq ($(BUILD_TARGET),freebsd)
+_BUILD_TARGET_OK    := 1
+endif
+
+ifeq ($(_BUILD_TARGET_OK),0)
+$(error kBuild: BUILD_TARGET value '$(BUILD_TARGET)' was not recongized!)
+endif
 endif
 
 # Fill in defaults if needed.
 ifndef BUILD_TARGET_ARCH
- BUILD_TARGET_ARCH  := x86
+BUILD_TARGET_ARCH   := x86
 endif
 ifndef BUILD_TARGET_CPU
- BUILD_TARGET_CPU   := i586
+BUILD_TARGET_CPU    := i586
 endif
 
 # Adjust the DEPTH definition first
@@ -163,34 +196,22 @@ endif
 # Common definitions.
 #
 ifeq ($(filter abspath,$(KMK_FEATURES)),abspath)
-
 PATH_CURRENT        := $(abspath $(CURDIR))
-ifneq ($(strip $(SUB_DEPTH)),)
-PATH_SUB_CURRENT    := $(abspath $(PATH_CURRENT)/$(SUB_DEPTH))
-else
-PATH_SUB_CURRENT    := $(PATH_CURRENT)
-endif
 PATH_ROOT           := $(abspath $(PATH_CURRENT)/$(DEPTH))
 
 else
 
 PATH_CURRENT        := $(CURDIR)
-PATH_SUB_CURRENT    := $(PATH_CURRENT)
-ifneq ($(strip $(SUB_DEPTH)),)
-ifneq ($(SUB_DEPTH),.)
-$(foreach d,$(subst /, ,$(SUB_DEPTH)), $(eval PATH_SUB_CURRENT := $(patsubst %/,%,$(dir $(PATH_SUB_CURRENT)))) )
-endif
-endif
+# Get the real root path.
 PATH_ROOT           := $(PATH_CURRENT)
 ifneq ($(DEPTH),.)
 $(foreach d,$(subst /, ,$(DEPTH)), $(eval PATH_ROOT := $(patsubst %/,%,$(dir $(PATH_ROOT)))) )
 endif
 
 endif
-
 # Subdirectory relative to the root.
 ifneq ($(PATH_ROOT),$(PATH_CURRENT))
-CURSUBDIR           := $(patsubst $(PATH_ROOT)/%,%,$(PATH_SUB_CURRENT))
+CURSUBDIR           := $(patsubst $(PATH_ROOT)/%,%,$(PATH_CURRENT))
 else
 CURSUBDIR           := .
 endif
@@ -200,11 +221,19 @@ ifndef PATH_OUT_BASE
 PATH_OUT_BASE       := $(PATH_ROOT)/out
 endif
 ifndef PATH_OUT
+ifeq ($(BUILD_PLATFORM_ARCH),x86)
 ifdef BUILD_TARGET_SUB # (BUILD_TARGET_SUB is not currently recognized by kBuild in any other places.)
-PATH_OUT            := $(PATH_OUT_BASE)/$(BUILD_TARGET).$(BUILD_TARGET_ARCH).$(BUILD_TARGET_SUB)/$(BUILD_TYPE)
+PATH_OUT            := $(PATH_OUT_BASE)/$(BUILD_TARGET)/$(BUILD_TARGET_SUB)/$(BUILD_TYPE)
 else
-PATH_OUT            := $(PATH_OUT_BASE)/$(BUILD_TARGET).$(BUILD_TARGET_ARCH)/$(BUILD_TYPE)
+PATH_OUT            := $(PATH_OUT_BASE)/$(BUILD_TARGET)/$(BUILD_TYPE)
 endif
+else  # !x86
+ifdef BUILD_TARGET_SUB # (BUILD_TARGET_SUB is not currently recognized by kBuild in any other places.)
+PATH_OUT            := $(PATH_OUT_BASE)/$(BUILD_TARGET)/$(BUILD_TARGET_ARCH)/$(BUILD_TARGET_SUB)/$(BUILD_TYPE)
+else
+PATH_OUT            := $(PATH_OUT_BASE)/$(BUILD_TARGET)/$(BUILD_TARGET_ARCH)/$(BUILD_TYPE)
+endif
+endif # !x86
 endif # !define PATH_OUT
 PATH_OBJ             = $(PATH_OUT)/obj
 PATH_TARGET          = $(PATH_OBJ)/$(CURSUBDIR)
@@ -241,6 +270,8 @@ endif
 #
 # Build platform setup.
 #
+PATH_TOOLS          := $(PATH_KBUILD)/bin/$(BUILD_PLATFORM_ARCH).$(BUILD_PLATFORM)
+
 # OS/2
 ifeq ($(BUILD_PLATFORM),os2)
 EXEC_X86_WIN32      := innopec.exe
@@ -253,8 +284,8 @@ EXEC_X86_WIN32      := wine
 HOSTSUFF_EXE        :=
 endif
 
-# Win32 & Win64
-ifeq ($(filter-out win32 win64 win nt,$(BUILD_TARGET)),)
+# Win32
+ifeq ($(BUILD_PLATFORM),win32)
 EXEC_X86_WIN32      :=
 HOSTSUFF_EXE        := .exe
 endif
@@ -265,33 +296,33 @@ EXEC_X86_WIN32      := wine
 HOSTSUFF_EXE        :=
 endif
 
-PATH_TOOLS          := $(PATH_KBUILD)/bin/$(BUILD_PLATFORM_ARCH).$(BUILD_PLATFORM)
-ifeq ($(wildcard $(PATH_TOOLS)/kmk_ash$(HOSTSUFF_EXE)),)
- ifeq ($(BUILD_TARGET_ARCH),amd64)
-  PATH_TOOLS        := $(PATH_KBUILD)/bin/x86.$(BUILD_PLATFORM)
- endif
- ifeq ($(wildcard $(PATH_TOOLS)/kmk_ash$(HOSTSUFF_EXE)),)
-  ifeq ($(filter-out win64 win nt ,$(BUILD_PLATFORM)),)
-   PATH_TOOLS       := $(PATH_KBUILD)/bin/x86.win32
-  endif
- endif
- ifeq ($(wildcard $(PATH_TOOLS)/kmk_ash$(HOSTSUFF_EXE)),)
-  # give up
-  PATH_TOOLS        := $(PATH_KBUILD)/bin/$(BUILD_PLATFORM_ARCH).$(BUILD_PLATFORM)
- endif
-endif
-
 
 #
 # Build target setup.
 #
-ifeq ($(filter-out win32 win64 win nt os2,$(BUILD_TARGET)),)
+ifeq ($(BUILD_TARGET),os2)
 SUFF_OBJ            := .obj
 SUFF_LIB            := .lib
 SUFF_DLL            := .dll
 SUFF_EXE            := .exe
 SUFF_SYS            := .sys
 SUFF_RES            := .res
+endif
+ifeq ($(BUILD_TARGET),win32)
+SUFF_OBJ            := .obj
+SUFF_LIB            := .lib
+SUFF_DLL            := .dll
+SUFF_EXE            := .exe
+SUFF_SYS            := .sys
+SUFF_RES            := .res
+endif
+ifeq ($(BUILD_TARGET),linux)
+SUFF_OBJ            := .o
+SUFF_LIB            := .a
+SUFF_DLL            := .so
+SUFF_EXE            :=
+SUFF_SYS            := .a
+SUFF_RES            :=
 endif
 ifeq ($(BUILD_TARGET),l4)
 SUFF_OBJ            := .o
@@ -301,122 +332,46 @@ SUFF_EXE            :=
 SUFF_SYS            := .a
 SUFF_RES            :=
 endif
-ifndef SUFF_OBJ
-SUFF_OBJ            := .o
-SUFF_LIB            := .a
-SUFF_DLL            := .so
-SUFF_EXE            :=
-SUFF_SYS            := .a
-SUFF_RES            :=
-endif
 
 #
 # Standard kBuild tools.
 #
+DEP                 := $(PATH_TOOLS)/kDep$(HOSTSUFF_EXE)
+DEP_PRE             := $(PATH_TOOLS)/kDepPre$(HOSTSUFF_EXE)
 ifeq ($(MAKE),kmk)
-MAKE        := $(PATH_TOOLS)/kmk$(HOSTSUFF_EXE)
+MAKE                := $(PATH_TOOLS)/kmk$(HOSTSUFF_EXE)
 endif
 
-DEP_EXT     := $(PATH_TOOLS)/kDep$(HOSTSUFF_EXE)
-ifeq ($(filter kDep,$(KMK_BUILTIN)),kDep)
-DEP         := kmk_builtin_kDep
+# Standard Unix shell utils
+ifdef KMK_BUILTIN
+ECHO                := kmk_builtin_echo
+MKDIR               := kmk_builtin_mkdir
+RM                  := kmk_builtin_rm
+CP                  := kmk_builtin_cp
 else
-DEP         := $(DEP_EXT)
+ECHO                := echo
+MKDIR               := $(PATH_TOOLS)/mkdir$(HOSTSUFF_EXE)
+RM                  := $(PATH_TOOLS)/rm$(HOSTSUFF_EXE)
+CP                  := $(PATH_TOOLS)/cp$(HOSTSUFF_EXE)
+APPEND              := $(PATH_TOOLS)/append$(HOSTSUFF_EXE)
 endif
-
-DEP_IDB_EXT := $(PATH_TOOLS)/kDepIDB$(HOSTSUFF_EXE)
-ifeq ($(filter kDepPre,$(KMK_BUILTIN)),kDepIDB)
-DEP_IDB     := $(if kmk_builtin_kDepIDB
-else
-DEP_IDB     := $(DEP_IDB_EXT)
-endif
-
-DEP_PRE_EXT := $(PATH_TOOLS)/kDepPre$(HOSTSUFF_EXE)
-ifeq ($(filter kDepPre,$(KMK_BUILTIN)),kDepPre)
-DEP_PRE     := $(if kmk_builtin_kDepPre
-else
-DEP_PRE     := $(DEP_PRE_EXT)
-endif
-
-APPEND_EXT  := $(PATH_TOOLS)/kmk_append$(HOSTSUFF_EXE)
-ifeq ($(filter append,$(KMK_BUILTIN)),append)
-APPEND      := kmk_builtin_append
-else
-APPEND      := $(APPEND_EXT)
-endif
-
-CAT_EXT     := $(PATH_TOOLS)/kmk_cat$(HOSTSUFF_EXE)
-ifeq ($(filter cat,$(KMK_BUILTIN)),cat)
-CAT         := kmk_builtin_cat
-else
-CAT         := $(CAT_EXT)
-endif
-
-CP_EXT      := $(PATH_TOOLS)/kmk_cp$(HOSTSUFF_EXE)
-ifeq ($(filter cp,$(KMK_BUILTIN)),cp)
-CP          := kmk_builtin_cp
-else
-CP          := $(CP_EXT)
-endif
-
-ECHO_EXT    := $(PATH_TOOLS)/kmk_echo$(HOSTSUFF_EXE)
-ifeq ($(filter echo,$(KMK_BUILTIN)),echo)
-ECHO        := kmk_builtin_echo
-else
-ECHO        := $(ECHO_EXT)
-endif
-
-INSTALL_EXT := $(PATH_TOOLS)/kmk_install$(HOSTSUFF_EXE)
-ifeq ($(filter install,$(KMK_BUILTIN)),install)
-INSTALL     := kmk_builtin_install
-else
-INSTALL     := $(INSTALL_EXT)
-endif
-
-LN_EXT      := $(PATH_TOOLS)/kmk_ln$(HOSTSUFF_EXE)
-ifeq ($(filter ln,$(KMK_BUILTIN)),ln)
-LN          := kmk_builtin_ln
-else
-LN          := $(LN_EXT)
-endif
-
-MKDIR_EXT   := $(PATH_TOOLS)/kmk_mkdir$(HOSTSUFF_EXE)
-ifeq ($(filter mkdir,$(KMK_BUILTIN)),mkdir)
-MKDIR       := kmk_builtin_mkdir
-else
-MKDIR       := $(MKDIR_EXT)
-endif
-
-MV_EXT      := $(PATH_TOOLS)/kmk_mv$(HOSTSUFF_EXE)
-ifeq ($(filter mv,$(KMK_BUILTIN)),mv)
-MV          := kmk_builtin_mv
-else
-MV          := $(MV_EXT)
-endif
-
-RM_EXT      := $(PATH_TOOLS)/kmk_rm$(HOSTSUFF_EXE)
-ifeq ($(filter rm,$(KMK_BUILTIN)),rm)
-RM          := kmk_builtin_rm
-else
-RM          := $(RM_EXT)
-endif
-
-SED_EXT     := $(PATH_TOOLS)/kmk_sed$(HOSTSUFF_EXE)
-ifeq ($(filter sed,$(KMK_BUILTIN)),sed)
-SED         := kmk_builtin_sed
-else
-SED         := $(SED_EXT)
-endif
-
-# Our default shell is the Almquist shell from *BSD.
-ASH         := $(PATH_TOOLS)/kmk_ash$(HOSTSUFF_EXE)
-MAKESHELL   := $(ASH)
-SHELL       := $(ASH)
+CP_EXT              := $(PATH_TOOLS)/cp$(HOSTSUFF_EXE)
+MV                  := $(PATH_TOOLS)/mv$(HOSTSUFF_EXE)
+SED                 := $(PATH_TOOLS)/sed$(HOSTSUFF_EXE)
+CAT                 := $(PATH_TOOLS)/cat$(HOSTSUFF_EXE)
+LN_SYMLINK          := $(CP)
+#LN_SYMLINK          := ln -s
+# Bourn shell clone.
+MAKESHELL           := $(PATH_TOOLS)/ash$(HOSTSUFF_EXE)
+SHELL               := $(MAKESHELL)
 export SHELL MAKESHELL
 
-# Symlinking is problematic on some platforms...
-LN_SYMLINK  := $(LN) -s
-
+# kBuild utils.
+ifeq ($(filter append,$(KMK_BUILTIN)),append)
+APPEND              := kmk_builtin_append
+else
+APPEND              := $(PATH_TOOLS)/append$(HOSTSUFF_EXE)
+endif
 
 
 #
@@ -463,7 +418,7 @@ endif
 ## DIRDEP - make create directory dependencies.
 #
 # @param	$1	The paths to the directories which must be created.
-ifeq ($(filter-out win32 win64 win nt,$(BUILD_PLATFORM)),)
+ifeq ($(BUILD_PLATFORM),win32)
 DIRDEP = $(patsubst %/,%,$(1))
 else
 DIRDEP = $(foreach path,$(patsubst %/,%,$(1)),$(path)/)
@@ -523,7 +478,7 @@ PROPS_DEFERRED := INSTFUN INSTALLER
 # A Config.kmk file can add it's own properties to this list and kBuild
 # will do the necessary inheritance from templates to targets.
 PROPS_ACCUMULATE := \
-	SDKS DEFS DEPS INCS SOURCES \
+	SDKS DEFS INCS SOURCES \
 	COPTS CFLAGS CDEFS CINCS CXXOPTS CXXFLAGS CXXDEFS CXXINCS \
 	ASOPTS ASFLAGS ASDEFS ASINCS \
 	LDFLAGS LIBS LIBPATH \
@@ -583,17 +538,15 @@ PASS_OTHERS_pass    := others
 # This pass installs the built entities to a sandbox area.
 PASS_INSTALLS       := Install
 PASS_INSTALLS_trgs  :=
-PASS_INSTALLS_vars  := _INSTALLS_DIRS _INSTALLS
+PASS_INSTALLS_vars  := _INSTALLS
 PASS_INSTALLS_pass  := installs
 
 ## PASS: packing
 # This pass processes custom packing rules.
 PASS_PACKING        := Packing
-PASS_PACKING_trgs   :=
-PASS_PACKING_vars   := _PACKING
+PASS_PACKING_trgs   := packing
+PASS_PACKING_vars   :=
 PASS_PACKING_pass   := packing
-#alias
-packing: pass_packing
 
 ## PASS: clean
 # This pass removes all generated files.
@@ -639,9 +592,6 @@ $(foreach dir,$(subst /, ,$(DEPTH)), $(eval $(def_include_config)) )
 _CFGFILE    := $(firstword $(wildcard $(_CFGFILES) $(FILE_KBUILD_CONFIG)))
 _CFGFILES   :=
 _CFGDIR     :=
-ifeq ($(_CFGFILE),)
-$(error kBuild: no Config.kmk file found! Check the DEPTH: DEPTH='$(DEPTH)' PATH_CURRENT='$(PATH_CURRENT)')
-endif
 
 # Include the config.kmk we found file (or the default one).
 include $(_CFGFILE)
@@ -650,4 +600,3 @@ include $(_CFGFILE)
 # end-of-file-content
 __header_kmk__ := 1
 endif # __header_kmk__
-

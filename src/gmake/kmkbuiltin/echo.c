@@ -37,9 +37,11 @@ static char const copyright[] =
 #ifndef lint
 static char sccsid[] = "@(#)echo.c	8.1 (Berkeley) 5/31/93";
 #endif /* not lint */
-#include <sys/cdefs.h>
-//__FBSDID("$FreeBSD: src/bin/echo/echo.c,v 1.17 2004/04/06 20:06:46 markm Exp $");
 #endif
+#ifndef _MSC_VER
+#include <sys/cdefs.h>
+#endif 
+//__FBSDID("$FreeBSD: src/bin/echo/echo.c,v 1.17 2004/04/06 20:06:46 markm Exp $");
 
 #include <sys/types.h>
 #ifndef _MSC_VER
@@ -54,14 +56,37 @@ static char sccsid[] = "@(#)echo.c	8.1 (Berkeley) 5/31/93";
 #include <string.h>
 #ifndef _MSC_VER
 #include <unistd.h>
-#else
-#include "mscfakes.h"
 #endif 
 
 #ifndef IOV_MAX
 #define IOV_MAX 1024
 #endif
 
+#ifdef _MSC_VER
+#include <io.h>
+
+struct iovec {
+    char *iov_base;
+    size_t iov_len;
+};
+
+int writev(int fd, const struct iovec *vector, int count)
+{
+    int size = 0;
+    int i;
+    for (i = 0; i < count; i++)
+    {
+        int cb = write(fd, vector[i].iov_base, vector[i].iov_len);
+        if (cb < 0)
+            return -1;
+        size += cb;
+    }
+    return size;
+}
+
+#define STDERR_FILENO 2
+#define STDOUT_FILENO 1
+#endif /* _MSC_VER */
 
 /*
  * Report an error and exit.
@@ -101,7 +126,7 @@ kmk_builtin_echo(int argc, char *argv[])
 
 	if ((iovfree = vp = iov = malloc((veclen + 1) * sizeof(struct iovec))) == NULL) {
 		errexit(progname, "malloc");
-                exit(1);
+                return 1;
         }
 
 	while (argv[0] != NULL) {

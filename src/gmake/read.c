@@ -3004,9 +3004,6 @@ multi_glob (struct nameseq *chain, unsigned int size)
   register struct nameseq *old;
   struct nameseq *nexto;
   glob_t gl;
-#if defined(KMK) || defined(__EMX__) /* speed optimization */
-  int rc;
-#endif
 
   dir_setup_glob (&gl);
 
@@ -3045,19 +3042,7 @@ multi_glob (struct nameseq *chain, unsigned int size)
 	memname = 0;
 #endif /* !NO_ARCHIVES */
 
-#if defined(KMK) || defined(__EMX__) /* speed optimization */
-      if (!strpbrk(old->name, "*?["))
-        {
-          gl.gl_pathc = 1;
-          gl.gl_pathv = &old->name;
-          rc = 0;
-        }
-      else
-        rc = glob (old->name, GLOB_NOCHECK|GLOB_ALTDIRFUNC, NULL, &gl);
-      switch (rc)
-#else
       switch (glob (old->name, GLOB_NOCHECK|GLOB_ALTDIRFUNC, NULL, &gl))
-#endif
 	{
 	case 0:			/* Success.  */
 	  {
@@ -3116,9 +3101,6 @@ multi_glob (struct nameseq *chain, unsigned int size)
 		    new = elt;
 		  }
 	      }
-#if defined(KMK) || defined(__EMX__) /* speed optimization */
-            if (gl.gl_pathv != &old->name)
-#endif
 	    globfree (&gl);
 	    free (old->name);
 	    free ((char *)old);

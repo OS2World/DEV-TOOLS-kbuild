@@ -28,10 +28,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include "kmkbuiltin/err.h"
 #include "kmkbuiltin.h"
 
 extern char **environ;
+
+extern int kmk_builtin_append(int argc, char **argv, char **envp);
+extern int kmk_builtin_cp(int argc, char **argv, char **envp);
+extern int kmk_builtin_chmod(int argc, char **argv, char **envp);
+extern int kmk_builtin_echo(int argc, char **argv, char **envp);
+extern int kmk_builtin_mkdir(int argc, char **argv, char **envp);
+extern int kmk_builtin_mv(int argc, char **argv, char **envp);
+extern int kmk_builtin_rm(int argc, char **argv, char **envp);
+extern int kmk_builtin_rmdir(int argc, char **argv, char **envp);
 
 int kmk_builtin_command(const char *pszCmd)
 {
@@ -161,7 +169,6 @@ int kmk_builtin_command(const char *pszCmd)
 int kmk_builtin_command_parsed(int argc, char **argv)
 {
     const char *pszCmd = argv[0];
-    int         iumask;
     int         rc;
 
     /*
@@ -177,34 +184,31 @@ int kmk_builtin_command_parsed(int argc, char **argv)
     /*
      * String switch on the command.
      */
-    iumask = umask(0);
-    umask(iumask);
     if (!strcmp(pszCmd, "append"))
         rc = kmk_builtin_append(argc, argv, environ);
+#ifndef _MSC_VER
+    else if (!strcmp(pszCmd, "cp"))
+        rc = kmk_builtin_cp(argc, argv, environ);
+    //else if (!strcmp(pszCmd, "chmod"))
+    //    rc = kmk_builtin_chmod(argc, argv, environ);
+#endif
     else if (!strcmp(pszCmd, "echo"))
         rc = kmk_builtin_echo(argc, argv, environ);
-    else if (!strcmp(pszCmd, "install"))
-        rc = kmk_builtin_install(argc, argv, environ);
-    else if (!strcmp(pszCmd, "ln"))
-        rc = kmk_builtin_ln(argc, argv, environ);
     else if (!strcmp(pszCmd, "mkdir"))
         rc = kmk_builtin_mkdir(argc, argv, environ);
+#ifndef _MSC_VER
     //else if (!strcmp(pszCmd, "mv"))
     //    rc = kmk_builtin_mv(argc, argv, environ);
     else if (!strcmp(pszCmd, "rm"))
         rc = kmk_builtin_rm(argc, argv, environ);
     //else if (!strcmp(pszCmd, "rmdir"))
     //    rc = kmk_builtin_rmdir(argc, argv, environ);
-    /* obsolete */
-    else if (!strcmp(pszCmd, "cp"))
-        rc = kmk_builtin_cp(argc, argv, environ);
+#endif
     else
     {
         printf("kmk_builtin: Unknown command '%s'!\n", pszCmd);
         return 1;
     }
-    g_progname = "kmk";                 /* paranoia, make sure it's not pointing at a freed argv[0]. */
-    umask(iumask);
     return rc;
 }
 

@@ -37,38 +37,25 @@ static const char copyright[] =
 #ifndef lint
 static char sccsid[] = "@(#)rm.c	8.5 (Berkeley) 4/18/94";
 #endif /* not lint */
+#endif
 #include <sys/cdefs.h>
 //__FBSDID("$FreeBSD: src/bin/rm/rm.c,v 1.47 2004/04/06 20:06:50 markm Exp $");
-#endif
-#ifdef __EMX__
-# define DO_RMTREE
-#endif
 
 #include <sys/stat.h>
-#ifndef _MSC_VER
 #include <sys/param.h>
 #include <sys/mount.h>
-#endif
 
-#include "err.h"
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#ifdef DO_RMTREE
 #include <fts.h>
-#endif
-#ifndef _MSC_VER
 #include <grp.h>
 #include <pwd.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _MSC_VER
 #include <sysexits.h>
 #include <unistd.h>
-#else
-#include "mscfakes.h"
-#endif
 
 #ifdef __EMX__
 #undef S_IFWHT
@@ -93,9 +80,7 @@ static int	check(char *, char *, struct stat *);
 static void	checkdot(char **);
 static void	rm_file(char **);
 static int	rm_overwrite(char *, struct stat *);
-#ifdef DO_RMTREE
 static void	rm_tree(char **);
-#endif
 static int	usage(void);
 
 /*
@@ -111,13 +96,9 @@ kmk_builtin_rm(int argc, char *argv[])
 	int ch, rflag;
 	char *p;
 
-        /* reinitialize globals */
         argv0 = argv[0];
         dflag = eval = fflag = iflag = Pflag = vflag = Wflag = stdin_ok = 0;
         uid = 0;
-
-        /* kmk: reset getopt and set program name. */
-        g_progname = argv[0];
         opterr = 1;
         optarg = NULL;
         optopt = 0;
@@ -128,7 +109,6 @@ kmk_builtin_rm(int argc, char *argv[])
         optind = 0; /* init */
 #endif
 
-#if 0 /* kmk: we don't need this */
 	/*
 	 * Test for the special case where the utility is called as
 	 * "unlink", for which the functionality provided is greatly
@@ -148,9 +128,7 @@ kmk_builtin_rm(int argc, char *argv[])
 		rm_file(&argv[0]);
 		return eval;
 	}
-#else
-        (void)p;
-#endif
+
 	Pflag = rflag = 0;
 	while ((ch = getopt(argc, argv, "dfiPRrvW")) != -1)
 		switch(ch) {
@@ -170,13 +148,8 @@ kmk_builtin_rm(int argc, char *argv[])
 			break;
 		case 'R':
 		case 'r':			/* Compatibility. */
-#ifdef DO_RMTREE
 			rflag = 1;
 			break;
-#else
-			errno = EINVAL;
-			return err(1, "Recursion is not supported!");
-#endif
 		case 'v':
 			vflag = 1;
 			break;
@@ -202,18 +175,16 @@ kmk_builtin_rm(int argc, char *argv[])
 
 	if (*argv) {
 		stdin_ok = isatty(STDIN_FILENO);
-#ifdef DO_RMTREE
+
 		if (rflag)
 			rm_tree(argv);
 		else
-#endif
 			rm_file(argv);
 	}
 
 	return eval;
 }
 
-#ifdef DO_RMTREE
 static void
 rm_tree(char **argv)
 {
@@ -242,10 +213,8 @@ rm_tree(char **argv)
 	if (Wflag)
 		flags |= FTS_WHITEOUT;
 #endif
-	if (!(fts = fts_open(argv, flags, NULL))) {
-		eval = err(1, "fts_open");
-		return;
-	}
+	if (!(fts = fts_open(argv, flags, NULL)))
+		err(1, "fts_open");
 	while ((p = fts_read(fts)) != NULL) {
 		switch (p->fts_info) {
 		case FTS_DNR:
@@ -256,8 +225,7 @@ rm_tree(char **argv)
 			}
 			continue;
 		case FTS_ERR:
-			eval = errx(1, "%s: %s", p->fts_path, strerror(p->fts_errno));
-                        return;
+			errx(1, "%s: %s", p->fts_path, strerror(p->fts_errno));
 		case FTS_NS:
 			/*
 			 * Assume that since fts_read() couldn't stat the
@@ -349,13 +317,6 @@ rm_tree(char **argv)
 					if (!rm_overwrite(p->fts_accpath, NULL))
 						continue;
 				rval = unlink(p->fts_accpath);
-#ifdef _MSC_VER
-				if (rval != 0) {
-    					chmod(p->fts_accpath, 0777);
-					rval = unlink(p->fts_accpath);
-				}
-#endif
-
 				if (rval == 0 || (fflag && errno == ENOENT)) {
 					if (rval == 0 && vflag)
 						(void)printf("%s\n",
@@ -373,7 +334,6 @@ err:
                 eval = 1;
         }
 }
-#endif /* DO_RMTREE */
 
 static void
 rm_file(char **argv)
@@ -434,12 +394,6 @@ rm_file(char **argv)
 					if (!rm_overwrite(f, &sb))
 						continue;
 				rval = unlink(f);
-#ifdef _MSC_VER
-				if (rval != 0) {
-    					chmod(f, 0777);
-					rval = unlink(f);
-				}
-#endif
 			}
 		}
 		if (rval && (!fflag || errno != ENOENT)) {
@@ -493,7 +447,7 @@ rm_overwrite(char *file, struct stat *sbp)
 	bsize = 1024;
 #endif
 	if ((buf = malloc(bsize)) == NULL)
-		exit(err(1, "%s: malloc", file));
+		err(1, "%s: malloc", file);
 
 #define	PASS(byte) {							\
 	memset(buf, byte, bsize);					\
@@ -557,7 +511,7 @@ check(char *path, char *name, struct stat *sp)
 		strmode(sp->st_mode, modep);
 #ifdef SF_APPEND
 		if ((flagsp = fflagstostr(sp->st_flags)) == NULL)
-			exit(err(1, "fflagstostr"));
+			err(1, "fflagstostr");
                 (void)fprintf(stderr, "override %s%s%s/%s %s%sfor %s? ",
                     modep + 1, modep[9] == ' ' ? "" : " ",
                     user_from_uid(sp->st_uid, 0),
@@ -566,7 +520,6 @@ check(char *path, char *name, struct stat *sp)
                     path);
 		free(flagsp);
 #else
-                (void)flagsp;
                 (void)fprintf(stderr, "override %s%s %d/%d for %s? ",
                     modep + 1, modep[9] == ' ' ? "" : " ",
                     sp->st_uid, sp->st_gid, path);

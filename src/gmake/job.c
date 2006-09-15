@@ -1009,11 +1009,7 @@ start_job_command (struct child *child)
      order to really fix this, we'll have to keep a lines_flags for every
      actual line, after expansion.  */
   child->file->cmds->lines_flags[child->command_line - 1]
-#ifdef CONFIG_WITH_KMK_BUILTIN
-    |= flags & (COMMANDS_RECURSE | COMMANDS_BUILTIN);
-#else
     |= flags & COMMANDS_RECURSE;
-#endif 
 
   /* Figure out an argument list from this command line.  */
 
@@ -1457,7 +1453,7 @@ static int
 start_waiting_job (struct child *c)
 {
   struct file *f = c->file;
-  DB (DB_KMK, (_("start_waiting_job %p (`%s') command_flags=%#x slots=%d/%d\n"), c, c->file->name, c->file->command_flags, job_slots_used, job_slots));
+  DB (DB_KMK, (_("start_waiting_job %p (`%s') command_flags=%#x\n"), c, c->file->name, c->file->command_flags));
 
   /* If we can start a job remotely, we always want to, and don't care about
      the local load average.  We record that the job should be started
@@ -1471,7 +1467,7 @@ start_waiting_job (struct child *c)
       (not_parallel || (c->file->command_flags & COMMANDS_NOTPARALLEL) || load_too_high ()))
     {
       /* Put this child on the chain of children waiting for the load average
-         to go down. if not parallel, put it last.  */
+         to go down. if not paralell, put it last.  */
       set_command_state (f, cs_running);
       c->next = waiting_jobs;
       if (c->next && (c->file->command_flags & COMMANDS_NOTPARALLEL))
@@ -1503,9 +1499,9 @@ start_waiting_job (struct child *c)
     {
     case cs_running:
       c->next = children;
-      DB (DB_JOBS, (_("Putting child 0x%08lx (%s) PID %ld%s on the chain. (%u/%u)\n"),
+      DB (DB_JOBS, (_("Putting child 0x%08lx (%s) PID %ld%s on the chain.\n"),
                     (unsigned long int) c, c->file->name,
-                    (long) c->pid, c->remote ? _(" (remote)") : "", job_slots_used + 1, job_slots));
+                    (long) c->pid, c->remote ? _(" (remote)") : ""));
       children = c;
       /* One more job slot is in use.  */
       ++job_slots_used;
@@ -1774,7 +1770,7 @@ new_job (struct file *file)
      (This will notice if there are in fact no commands.)  */
   (void) start_waiting_job (c);
 
-  if (job_slots == 1 || not_parallel > 0)
+  if (job_slots == 1 || not_parallel < 0)
     /* Since there is only one job slot, make things run linearly.
        Wait for the child to die, setting the state to `cs_finished'.  */
     while (file->command_state == cs_running)
@@ -3196,22 +3192,7 @@ construct_command_argv (char *line, char **restp, struct file *file,
 
     warn_undefined_variables_flag = save;
   }
-#if defined(CONFIG_WITH_KMK_BUILTIN) && defined(WINDOWS32)
-  if (!strncmp(line, "kmk_builtin_", sizeof("kmk_builtin_") - 1))
-  {
-    int saved_batch_mode_shell = batch_mode_shell;
-    int saved_no_default_sh_exe = no_default_sh_exe;
-    int saved_unixy_shell = unixy_shell;
-    unixy_shell = 1;
-    batch_mode_shell = 0;
-    no_default_sh_exe = 0;
-    argv = construct_command_argv_internal (line, restp, shell, ifs, batch_filename_ptr);
-    no_default_sh_exe = saved_no_default_sh_exe;
-    batch_mode_shell = saved_batch_mode_shell;
-    unixy_shell = saved_unixy_shell;
-  }
-  else
-#endif
+
   argv = construct_command_argv_internal (line, restp, shell, ifs, batch_filename_ptr);
 
   free (shell);
