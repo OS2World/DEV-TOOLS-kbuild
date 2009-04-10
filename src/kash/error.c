@@ -68,8 +68,9 @@ volatile int suppressint;
 volatile int intpending;
 char *commandname;*/
 
-SH_NORETURN_1
-static void exverror(shinstance *psh, int, const char *, va_list) SH_NORETURN_2;
+
+static void exverror(shinstance *psh, int, const char *, va_list)
+    __attribute__((__noreturn__));
 
 /*
  * Called to raise an exception.  Since C doesn't include exceptions, we
@@ -77,7 +78,7 @@ static void exverror(shinstance *psh, int, const char *, va_list) SH_NORETURN_2;
  * stored in the global variable "exception".
  */
 
-SH_NORETURN_1 void
+void
 exraise(shinstance *psh, int e)
 {
 	if (psh->handler == NULL)
@@ -170,7 +171,7 @@ exverror(shinstance *psh, int cond, const char *msg, va_list ap)
 }
 
 
-SH_NORETURN_1 void
+void
 error(shinstance *psh, const char *msg, ...)
 {
 	va_list ap;
@@ -182,7 +183,7 @@ error(shinstance *psh, const char *msg, ...)
 }
 
 
-SH_NORETURN_1 void
+void
 exerror(shinstance *psh, int cond, const char *msg, ...)
 {
 	va_list ap;
@@ -197,14 +198,14 @@ exerror(shinstance *psh, int cond, const char *msg, ...)
  * error/warning routines for external builtins
  */
 
-SH_NORETURN_1 void
+void
 sh_exit(shinstance *psh, int rval)
 {
 	psh->exerrno = rval & 255;
 	exraise(psh, EXEXEC);
 }
 
-SH_NORETURN_1 void
+void
 sh_err(shinstance *psh, int status, const char *fmt, ...)
 {
 	va_list ap;
@@ -215,14 +216,14 @@ sh_err(shinstance *psh, int status, const char *fmt, ...)
 	sh_exit(psh, status);
 }
 
-SH_NORETURN_1 void
+void
 sh_verr(shinstance *psh, int status, const char *fmt, va_list ap)
 {
 	exvwarning(psh, errno, fmt, ap);
 	sh_exit(psh, status);
 }
 
-SH_NORETURN_1 void
+void
 sh_errx(shinstance *psh, int status, const char *fmt, ...)
 {
 	va_list ap;
@@ -233,7 +234,7 @@ sh_errx(shinstance *psh, int status, const char *fmt, ...)
 	sh_exit(psh, status);
 }
 
-SH_NORETURN_1 void
+void
 sh_verrx(shinstance *psh, int status, const char *fmt, va_list ap)
 {
 	exvwarning(psh, -1, fmt, ap);

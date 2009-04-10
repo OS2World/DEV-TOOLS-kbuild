@@ -37,23 +37,26 @@
 # include <alloca.h>
 #endif
 #if !defined(_MSC_VER)
+# include <stdint.h>
 # include <unistd.h>
 #else
+# define USE_WIN_MMAP
 # include <io.h>
+# include <Windows.h>
+ typedef unsigned char  uint8_t;
+ typedef unsigned short uint16_t;
+ typedef unsigned int   uint32_t;
 #endif
-#include "../../lib/k/kDefs.h"
-#include "../../lib/k/kTypes.h"
+/*#include "kDep.h"*/
 #include "../../lib/kDep.h"
 #include "kmkbuiltin.h"
 
+#define OFFSETOF(type, member)  ( (int)(size_t)(void *)&( ((type *)(void *)0)->member) )
 
-/*******************************************************************************
-*   Defined Constants And Macros                                               *
-*******************************************************************************/
 /*#define DEBUG*/
 #ifdef DEBUG
 # define dprintf(a)             printf a
-# define dump(pb, cb, offBase)  depHexDump(pb,cb,offBase)
+# define dump(pb, cb, offBase)  hexdump(pb,cb,offBase)
 #else
 # define dprintf(a)             do {} while (0)
 # define dump(pb, cb, offBase)  do {} while (0)
@@ -66,6 +69,38 @@
 /** the executable name. */
 static const char *argv0 = "";
 
+#ifdef DEBUG
+/**
+ * Performs a hexdump.
+ */
+static void hexdump(const uint8_t *pb, size_t cb, size_t offBase)
+{
+    static const char   szHex[16] = "0123456789abcdef";
+
+    const unsigned      cchWidth = 16;
+    size_t              off = 0;
+    while (off < cb)
+    {
+        unsigned i;
+        printf("%s%0*x %04x:", off ? "\n" : "", sizeof(pb) * 2, offBase + off, off);
+        for (i = 0; i < cchWidth && off + i < cb ; i++)
+            printf(off + i < cb ? !(i & 7) && i ? "-%02x" : " %02x" : "   ", pb[i]);
+
+        while (i++ < cchWidth)
+                printf("   ");
+        printf(" ");
+
+        for (i = 0; i < cchWidth && off + i < cb; i++)
+        {
+            const uint8_t u8 = pb[i];
+            printf("%c", u8 < 127 && u8 >= 32 ? u8 : '.', 1);
+        }
+        off += cchWidth;
+        pb  += cchWidth;
+    }
+    printf("\n");
+}
+#endif
 
 /**
  * Scans a stream (chunk of data really) for dependencies.
@@ -77,9 +112,9 @@ static const char *argv0 = "";
  * @param   pszPrefix       The dependency prefix.
  * @param   cchPrefix       The size of the prefix.
  */
-static int ScanStream(KU8 *pbStream, size_t cbStream, const char *pszPrefix, size_t cchPrefix)
+static int ScanStream(uint8_t *pbStream, size_t cbStream, const char *pszPrefix, size_t cchPrefix)
 {
-    const KU8      *pbCur = pbStream;
+    const uint8_t  *pbCur = pbStream;
     size_t          cbLeft = cbStream;
     register char   chFirst = *pszPrefix;
     while (cbLeft > cchPrefix + 2)
@@ -107,6 +142,98 @@ static int ScanStream(KU8 *pbStream, size_t cbStream, const char *pszPrefix, siz
 }
 
 
+#ifdef USE_WIN_MMAP
+/** Handle to the current file mapping object. */
+static HANDLE g_hMapObj = NULL;
+#endif
+
+
+/**
+ * Reads the file specified by the pInput file stream into memory.
+ * The size of the file is returned in *pcbFile if specified.
+ * The returned pointer should be freed by FreeFileMemory().
+ */
+void *ReadFileIntoMemory(FILE *pInput, size_t *pcbFile)
+{
+    void       *pvFile;
+    long        cbFile;
+
+    /*
+     * Figure out file size.
+     */
+#if defined(_MSC_VER)
+    cbFile = _filelength(fileno(pInput));
+    if (cbFile < 0)
+#else
+    if (    fseek(pInput, 0, SEEK_END) < 0
+        ||  (cbFile = ftell(pInput)) < 0
+        ||  fseek(pInput, 0, SEEK_SET))
+#endif
+    {
+        fprintf(stderr, "%s: error: Failed to determin file size.\n", argv0);
+        return NULL;
+    }
+    if (pcbFile)
+        *pcbFile = cbFile;
+
+    /*
+     * Try mmap first.
+     */
+#ifdef USE_WIN_MMAP
+    {
+        HANDLE hMapObj = CreateFileMapping((HANDLE)_get_osfhandle(fileno(pInput)),
+                                           NULL, PAGE_READONLY, 0, cbFile, NULL);
+        if (hMapObj != NULL)
+        {
+            pvFile = MapViewOfFile(hMapObj, FILE_MAP_READ, 0, 0, cbFile);
+            if (pvFile)
+            {
+                g_hMapObj = hMapObj;
+                return pvFile;
+            }
+            fprintf(stderr, "%s: warning: MapViewOfFile failed, %d.\n", argv0, GetLastError());
+            CloseHandle(hMapObj);
+        }
+        else
+            fprintf(stderr, "%s: warning: CreateFileMapping failed, %d.\n", argv0, GetLastError());
+    }
+
+#endif
+
+    /*
+     * Allocate memory and read the file.
+     */
+    pvFile = malloc(cbFile + 1);
+    if (pvFile)
+    {
+        if (fread(pvFile, cbFile, 1, pInput))
+        {
+            ((uint8_t *)pvFile)[cbFile] = '\0';
+            return pvFile;
+        }
+        fprintf(stderr, "%s: error: Failed to read %ld bytes.\n", argv0, cbFile);
+        free(pvFile);
+    }
+    else
+        fprintf(stderr, "%s: error: Failed to allocate %ld bytes (file mapping).\n", argv0, cbFile);
+    return NULL;
+}
+
+
+static void FreeFileMemory(void *pvFile)
+{
+#if defined(USE_WIN_MMAP)
+    if (g_hMapObj)
+    {
+        UnmapViewOfFile(pvFile);
+        CloseHandle(g_hMapObj);
+        return;
+    }
+#endif
+    free(pvFile);
+}
+
+
 /*/////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -116,7 +243,7 @@ static int ScanStream(KU8 *pbStream, size_t cbStream, const char *pszPrefix, siz
 /////////////////////////////////////////////////////////////////////////////*/
 
 /** A PDB 7.0 Page number. */
-typedef KU32 PDB70PAGE;
+typedef uint32_t PDB70PAGE;
 /** Pointer to a PDB 7.0 Page number. */
 typedef PDB70PAGE *PPDB70PAGE;
 
@@ -126,7 +253,7 @@ typedef PDB70PAGE *PPDB70PAGE;
 typedef struct PDB70STREAM
 {
     /** The size of the stream. */
-    KU32        cbStream;
+    uint32_t    cbStream;
 } PDB70STREAM, *PPDB70STREAM;
 
 
@@ -138,17 +265,17 @@ typedef struct PDB70STREAM
 typedef struct PDB70HDR
 {
     /** The signature string. */
-    KU8         szSignature[sizeof(PDB_SIGNATURE_700)];
+    uint8_t     szSignature[sizeof(PDB_SIGNATURE_700)];
     /** The page size. */
-    KU32        cbPage;
+    uint32_t    cbPage;
     /** The start page. */
     PDB70PAGE   iStartPage;
     /** The number of pages in the file. */
     PDB70PAGE   cPages;
     /** The root stream directory. */
-    KU32        cbRoot;
+    uint32_t    cbRoot;
     /** Unknown function, always 0. */
-    KU32        u32Reserved;
+    uint32_t    u32Reserved;
     /** The page index of the root page table. */
     PDB70PAGE   iRootPages;
 } PDB70HDR, *PPDB70HDR;
@@ -159,10 +286,10 @@ typedef struct PDB70HDR
 typedef struct PDB70ROOT
 {
     /** The number of streams */
-    KU32        cStreams;
+    uint32_t    cStreams;
     /** Array of streams. */
     PDB70STREAM aStreams[1];
-    /* KU32 aiPages[] */
+    /* uint32_t aiPages[] */
 } PDB70ROOT, *PPDB70ROOT;
 
 /**
@@ -171,15 +298,15 @@ typedef struct PDB70ROOT
 typedef struct PDB70NAMES
 {
     /** The structure version. */
-    KU32            Version;
+    uint32_t        Version;
     /** Timestamp.  */
-    KU32            TimeStamp;
+    uint32_t        TimeStamp;
     /** Unknown. */
-    KU32            Unknown1;
+    uint32_t        Unknown1;
     /** GUID. */
-    KU32            u32Guid[4];
+    uint32_t        u32Guid[4];
     /** The size of the following name table. */
-    KU32            cbNames;
+    uint32_t        cbNames;
     /** The name table. */
     char            szzNames[1];
 } PDB70NAMES, *PPDB70NAMES;
@@ -213,7 +340,7 @@ static int Pdb70ValidateHeader(PPDB70HDR pHdr, size_t cbFile)
 #ifdef DEBUG
 static size_t Pdb70Align(PPDB70HDR pHdr, size_t cb)
 {
-    if (cb == ~(KU32)0 || !cb)
+    if (cb == ~(uint32_t)0 || !cb)
         return 0;
     return ((cb + pHdr->cbPage - 1) / pHdr->cbPage) * pHdr->cbPage;
 }
@@ -221,7 +348,7 @@ static size_t Pdb70Align(PPDB70HDR pHdr, size_t cb)
 
 static size_t Pdb70Pages(PPDB70HDR pHdr, size_t cb)
 {
-    if (cb == ~(KU32)0 || !cb)
+    if (cb == ~(uint32_t)0 || !cb)
         return 0;
     return (cb + pHdr->cbPage - 1) / pHdr->cbPage;
 }
@@ -230,7 +357,7 @@ static void *Pdb70AllocAndRead(PPDB70HDR pHdr, size_t cb, PPDB70PAGE paiPageMap)
 {
     const size_t    cbPage = pHdr->cbPage;
     size_t          cPages = Pdb70Pages(pHdr, cb);
-    KU8            *pbBuf = malloc(cPages * cbPage + 1);
+    uint8_t *pbBuf = malloc(cPages * cbPage + 1);
     if (pbBuf)
     {
         size_t iPage = 0;
@@ -240,7 +367,7 @@ static void *Pdb70AllocAndRead(PPDB70HDR pHdr, size_t cb, PPDB70PAGE paiPageMap)
             if (off < pHdr->cPages)
             {
                 off *= cbPage;
-                memcpy(pbBuf + iPage * cbPage, (KU8 *)pHdr + off, cbPage);
+                memcpy(pbBuf + iPage * cbPage, (uint8_t *)pHdr + off, cbPage);
                 dump(pbBuf + iPage * cbPage, iPage + 1 < cPages ? cbPage : cb % cbPage, off);
             }
             else
@@ -265,14 +392,14 @@ static PPDB70ROOT Pdb70AllocAndReadRoot(PPDB70HDR pHdr)
      * The tricky bit here is to find the right length. Really?
      * (Todo: Check if we can just use the stream #0 size..)
      */
-    PPDB70PAGE piPageMap = (KU32 *)((KU8 *)pHdr + pHdr->iRootPages * pHdr->cbPage);
+    PPDB70PAGE piPageMap = (uint32_t *)((uint8_t *)pHdr + pHdr->iRootPages * pHdr->cbPage);
     PPDB70ROOT pRoot = Pdb70AllocAndRead(pHdr, pHdr->cbRoot, piPageMap);
     if (pRoot)
     {
 #if 1
         /* This stuff is probably unnecessary: */
         /* size = stream header + array of stream. */
-        size_t cb = K_OFFSETOF(PDB70ROOT, aStreams[pRoot->cStreams]);
+        size_t cb = OFFSETOF(PDB70ROOT, aStreams[pRoot->cStreams]);
         free(pRoot);
         pRoot = Pdb70AllocAndRead(pHdr, cb, piPageMap);
         if (pRoot)
@@ -280,7 +407,7 @@ static PPDB70ROOT Pdb70AllocAndReadRoot(PPDB70HDR pHdr)
             /* size += page tables. */
             unsigned iStream = pRoot->cStreams;
             while (iStream-- > 0)
-                if (pRoot->aStreams[iStream].cbStream != ~(KU32)0)
+                if (pRoot->aStreams[iStream].cbStream != ~(uint32_t)0)
                     cb += Pdb70Pages(pHdr, pRoot->aStreams[iStream].cbStream) * sizeof(PDB70PAGE);
             free(pRoot);
             pRoot = Pdb70AllocAndRead(pHdr, cb, piPageMap);
@@ -303,7 +430,7 @@ static void *Pdb70AllocAndReadStream(PPDB70HDR pHdr, PPDB70ROOT pRoot, unsigned 
     const size_t    cbStream = pRoot->aStreams[iStream].cbStream;
     PPDB70PAGE      paiPageMap;
     if (    iStream >= pRoot->cStreams
-        ||  cbStream == ~(KU32)0)
+        ||  cbStream == ~(uint32_t)0)
     {
         fprintf(stderr, "%s: error: Invalid stream %d\n", argv0, iStream);
         return NULL;
@@ -311,7 +438,7 @@ static void *Pdb70AllocAndReadStream(PPDB70HDR pHdr, PPDB70ROOT pRoot, unsigned 
 
     paiPageMap = (PPDB70PAGE)&pRoot->aStreams[pRoot->cStreams];
     while (iStream-- > 0)
-        if (pRoot->aStreams[iStream].cbStream != ~(KU32)0)
+        if (pRoot->aStreams[iStream].cbStream != ~(uint32_t)0)
             paiPageMap += Pdb70Pages(pHdr, pRoot->aStreams[iStream].cbStream);
 
     if (pcbStream)
@@ -319,7 +446,7 @@ static void *Pdb70AllocAndReadStream(PPDB70HDR pHdr, PPDB70ROOT pRoot, unsigned 
     return Pdb70AllocAndRead(pHdr, cbStream, paiPageMap);
 }
 
-static int Pdb70Process(KU8 *pbFile, size_t cbFile)
+static int Pdb70Process(uint8_t *pbFile, size_t cbFile)
 {
     PPDB70HDR   pHdr = (PPDB70HDR)pbFile;
     PPDB70ROOT  pRoot;
@@ -349,7 +476,7 @@ static int Pdb70Process(KU8 *pbFile, size_t cbFile)
         dprintf(("Names: Version=%u cbNames=%u (%#x)\n", pNames->Version, pNames->cbNames, pNames->cbNames));
         if (    pNames->Version == PDB70NAMES_VERSION
             &&  pNames->cbNames > 32
-            &&  pNames->cbNames + K_OFFSETOF(PDB70NAMES, szzNames) <= pRoot->aStreams[1].cbStream)
+            &&  pNames->cbNames + offsetof(PDB70NAMES, szzNames) <= pRoot->aStreams[1].cbStream)
         {
             /*
              * Iterate the names and add the /mr/inversedeps/ ones to the dependency list.
@@ -401,13 +528,13 @@ static int Pdb70Process(KU8 *pbFile, size_t cbFile)
         rc = 0;
         for (iStream = 0; iStream < pRoot->cStreams && !rc; iStream++)
         {
-            KU8 *pbStream;
-            if (    pRoot->aStreams[iStream].cbStream == ~(KU32)0
+            uint8_t *pbStream;
+            if (    pRoot->aStreams[iStream].cbStream == ~(uint32_t)0
                 ||  !pRoot->aStreams[iStream].cbStream)
                 continue;
             dprintf(("Stream #%d: %#x bytes (%#x aligned)\n", iStream, pRoot->aStreams[iStream].cbStream,
                      Pdb70Align(pHdr, pRoot->aStreams[iStream].cbStream)));
-            pbStream = (KU8 *)Pdb70AllocAndReadStream(pHdr, pRoot, iStream, &cbStream);
+            pbStream = (uint8_t *)Pdb70AllocAndReadStream(pHdr, pRoot, iStream, &cbStream);
             if (pbStream)
             {
                 rc = ScanStream(pbStream, cbStream, "/mr/inversedeps/", sizeof("/mr/inversedeps/") - 1);
@@ -434,7 +561,7 @@ static int Pdb70Process(KU8 *pbFile, size_t cbFile)
 
 
 /** A PDB 2.0 Page number. */
-typedef KU16 PDB20PAGE;
+typedef uint16_t PDB20PAGE;
 /** Pointer to a PDB 2.0 Page number. */
 typedef PDB20PAGE *PPDB20PAGE;
 
@@ -444,9 +571,9 @@ typedef PDB20PAGE *PPDB20PAGE;
 typedef struct PDB20STREAM
 {
     /** The size of the stream. */
-    KU32        cbStream;
+    uint32_t    cbStream;
     /** Some unknown value. */
-    KU32        u32Unknown;
+    uint32_t    u32Unknown;
 } PDB20STREAM, *PPDB20STREAM;
 
 /** The PDB 2.00 signature. */
@@ -457,9 +584,9 @@ typedef struct PDB20STREAM
 typedef struct PDB20HDR
 {
     /** The signature string. */
-    KU8         szSignature[sizeof(PDB_SIGNATURE_200)];
+    uint8_t     szSignature[sizeof(PDB_SIGNATURE_200)];
     /** The page size. */
-    KU32        cbPage;
+    uint32_t    cbPage;
     /** The start page - whatever that is... */
     PDB20PAGE   iStartPage;
     /** The number of pages in the file. */
@@ -476,9 +603,9 @@ typedef struct PDB20HDR
 typedef struct PDB20ROOT
 {
     /** The number of streams */
-    KU16        cStreams;
+    uint16_t    cStreams;
     /** Reserved or high part of cStreams. */
-    KU16        u16Reserved;
+    uint16_t    u16Reserved;
     /** Array of streams. */
     PDB20STREAM aStreams[1];
 } PDB20ROOT, *PPDB20ROOT;
@@ -501,7 +628,7 @@ static int Pdb20ValidateHeader(PPDB20HDR pHdr, size_t cbFile)
 
 static size_t Pdb20Pages(PPDB20HDR pHdr, size_t cb)
 {
-    if (cb == ~(KU32)0 || !cb)
+    if (cb == ~(uint32_t)0 || !cb)
         return 0;
     return (cb + pHdr->cbPage - 1) / pHdr->cbPage;
 }
@@ -509,7 +636,7 @@ static size_t Pdb20Pages(PPDB20HDR pHdr, size_t cb)
 static void *Pdb20AllocAndRead(PPDB20HDR pHdr, size_t cb, PPDB20PAGE paiPageMap)
 {
     size_t cPages = Pdb20Pages(pHdr, cb);
-    KU8   *pbBuf = malloc(cPages * pHdr->cbPage + 1);
+    uint8_t *pbBuf = malloc(cPages * pHdr->cbPage + 1);
     if (pbBuf)
     {
         size_t iPage = 0;
@@ -517,7 +644,7 @@ static void *Pdb20AllocAndRead(PPDB20HDR pHdr, size_t cb, PPDB20PAGE paiPageMap)
         {
             size_t off = paiPageMap[iPage];
             off *= pHdr->cbPage;
-            memcpy(pbBuf + iPage * pHdr->cbPage, (KU8 *)pHdr + off, pHdr->cbPage);
+            memcpy(pbBuf + iPage * pHdr->cbPage, (uint8_t *)pHdr + off, pHdr->cbPage);
             iPage++;
         }
         pbBuf[cPages * pHdr->cbPage] = '\0';
@@ -537,7 +664,7 @@ static PPDB20ROOT Pdb20AllocAndReadRoot(PPDB20HDR pHdr)
     if (pRoot)
     {
         /* size = stream header + array of stream. */
-        size_t cb = K_OFFSETOF(PDB20ROOT, aStreams[pRoot->cStreams]);
+        size_t cb = OFFSETOF(PDB20ROOT, aStreams[pRoot->cStreams]);
         free(pRoot);
         pRoot = Pdb20AllocAndRead(pHdr, cb, &pHdr->aiRootPageMap[0]);
         if (pRoot)
@@ -545,7 +672,7 @@ static PPDB20ROOT Pdb20AllocAndReadRoot(PPDB20HDR pHdr)
             /* size += page tables. */
             unsigned iStream = pRoot->cStreams;
             while (iStream-- > 0)
-                if (pRoot->aStreams[iStream].cbStream != ~(KU32)0)
+                if (pRoot->aStreams[iStream].cbStream != ~(uint32_t)0)
                     cb += Pdb20Pages(pHdr, pRoot->aStreams[iStream].cbStream) * sizeof(PDB20PAGE);
             free(pRoot);
             pRoot = Pdb20AllocAndRead(pHdr, cb, &pHdr->aiRootPageMap[0]);
@@ -565,7 +692,7 @@ static void *Pdb20AllocAndReadStream(PPDB20HDR pHdr, PPDB20ROOT pRoot, unsigned 
     size_t      cbStream = pRoot->aStreams[iStream].cbStream;
     PPDB20PAGE  paiPageMap;
     if (    iStream >= pRoot->cStreams
-        ||  cbStream == ~(KU32)0)
+        ||  cbStream == ~(uint32_t)0)
     {
         fprintf(stderr, "%s: error: Invalid stream %d\n", argv0, iStream);
         return NULL;
@@ -573,7 +700,7 @@ static void *Pdb20AllocAndReadStream(PPDB20HDR pHdr, PPDB20ROOT pRoot, unsigned 
 
     paiPageMap = (PPDB20PAGE)&pRoot->aStreams[pRoot->cStreams];
     while (iStream-- > 0)
-        if (pRoot->aStreams[iStream].cbStream != ~(KU32)0)
+        if (pRoot->aStreams[iStream].cbStream != ~(uint32_t)0)
             paiPageMap += Pdb20Pages(pHdr, pRoot->aStreams[iStream].cbStream);
 
     if (pcbStream)
@@ -581,7 +708,7 @@ static void *Pdb20AllocAndReadStream(PPDB20HDR pHdr, PPDB20ROOT pRoot, unsigned 
     return Pdb20AllocAndRead(pHdr, cbStream, paiPageMap);
 }
 
-static int Pdb20Process(KU8 *pbFile, size_t cbFile)
+static int Pdb20Process(uint8_t *pbFile, size_t cbFile)
 {
     PPDB20HDR   pHdr = (PPDB20HDR)pbFile;
     PPDB20ROOT  pRoot;
@@ -604,10 +731,10 @@ static int Pdb20Process(KU8 *pbFile, size_t cbFile)
     rc = 0;
     for (iStream = 0; iStream < pRoot->cStreams && !rc; iStream++)
     {
-        KU8 *pbStream;
-        if (pRoot->aStreams[iStream].cbStream == ~(KU32)0)
+        uint8_t *pbStream;
+        if (pRoot->aStreams[iStream].cbStream == ~(uint32_t)0)
             continue;
-        pbStream = (KU8 *)Pdb20AllocAndReadStream(pHdr, pRoot, iStream, NULL);
+        pbStream = (uint8_t *)Pdb20AllocAndReadStream(pHdr, pRoot, iStream, NULL);
         if (pbStream)
         {
             rc = ScanStream(pbStream, pRoot->aStreams[iStream].cbStream, "/ipm/header/", sizeof("/ipm/header/") - 1);
@@ -628,14 +755,13 @@ static int Pdb20Process(KU8 *pbFile, size_t cbFile)
 static int ProcessIDB(FILE *pInput)
 {
     size_t      cbFile;
-    KU8        *pbFile;
-    void       *pvOpaque;
+    uint8_t    *pbFile;
     int         rc = 0;
 
     /*
      * Read the file into memory.
      */
-    pbFile = (KU8 *)depReadFileIntoMemory(pInput, &cbFile, &pvOpaque);
+    pbFile = (uint8_t *)ReadFileIntoMemory(pInput, &cbFile);
     if (!pbFile)
         return 1;
 
@@ -652,7 +778,7 @@ static int ProcessIDB(FILE *pInput)
         rc = 1;
     }
 
-    depFreeFileMemory(pbFile, pvOpaque);
+    FreeFileMemory(pbFile);
     return rc;
 }
 

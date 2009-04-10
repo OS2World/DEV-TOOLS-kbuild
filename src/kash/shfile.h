@@ -101,21 +101,9 @@
 typedef struct shfile
 {
     int                 fd;             /**< The shell file descriptor number. */
-    unsigned            oflags;         /**< Open flags. */
-    unsigned            shflags;        /**< The shell file descriptor flags. */
+    int                 flags;          /**< Open flags. */
     intptr_t            native;         /**< The native file descriptor number. */
 } shfile;
-
-/** @name shfile::shflags values.
- * @{
- */
-#define SHFILE_FLAGS_CLOSE_ON_EXEC      0x0001
-#define SHFILE_FLAGS_TYPE_MASK          0x00f0
-#define SHFILE_FLAGS_FILE               0x0000
-#define SHFILE_FLAGS_PIPE               0x0010
-#define SHFILE_FLAGS_DIR                0x0020
-#define SHFILE_FLAGS_TTY                0x0030
-/** @} */
 
 /**
  * The file descriptor table for a shell.
@@ -127,10 +115,6 @@ typedef struct shfdtab
     unsigned            size;           /**< The size of the table (number of entries). */
     shfile             *tab;            /**< Pointer to the table. */
 } shfdtab;
-
-int shfile_init(shfdtab *, shfdtab *);
-void shfile_fork_win(shfdtab *pfdtab, int set, intptr_t *hndls);
-void *shfile_exec_win(shfdtab *pfdtab, int prepare, unsigned short *sizep, intptr_t *hndls);
 
 int shfile_open(shfdtab *, const char *, unsigned, mode_t);
 int shfile_pipe(shfdtab *, int [2]);
@@ -162,7 +146,6 @@ typedef struct sh_winsize
 typedef struct winsize sh_winsize;
 #endif
 mode_t shfile_get_umask(shfdtab *);
-void   shfile_set_umask(shfdtab *, mode_t);
 
 
 typedef struct sh_dirent

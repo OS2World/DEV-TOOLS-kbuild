@@ -83,8 +83,8 @@ STATIC union node *prevcmd;
 
 STATIC void read_profile(struct shinstance *, const char *);
 STATIC char *find_dot_file(struct shinstance *, char *);
-int main(int, char **, char **);
-SH_NORETURN_1 void shell_main(shinstance *, int, char **) SH_NORETURN_2;
+int main(int, char **);
+int shell_main(shinstance *, int, char **);
 #ifdef _MSC_VER
 extern void init_syntax(void);
 #endif
@@ -100,11 +100,7 @@ STATIC int version(const char *argv0);
  */
 
 int
-#if K_OS == K_OS_WINDOWS
-real_main(int argc, char **argv, char **envp)
-#else
-main(int argc, char **argv, char **envp)
-#endif
+main(int argc, char **argv)
 {
 	shinstance *psh;
 
@@ -129,16 +125,14 @@ main(int argc, char **argv, char **envp)
 	/*
 	 * Create the root shell instance.
 	 */
-	psh = sh_create_root_shell(NULL, argc, argv, envp);
+	psh = sh_create_root_shell(NULL, argc, argv);
 	if (!psh)
 		return 2;
 	shthread_set_shell(psh);
-	shell_main(psh, argc, psh->argptr);
-	/* Not reached. */
-	return 89;
+	return shell_main(psh, argc, argv);
 }
 
-SH_NORETURN_1 void
+int
 shell_main(shinstance *psh, int argc, char **argv)
 {
 	struct jmploc jmploc;
@@ -237,7 +231,7 @@ state3:
 		    SIGPIPE
 		};
 #define SIGSSIZE (sizeof(sigs)/sizeof(sigs[0]))
-		unsigned i;
+		int i;
 
 		for (i = 0; i < SIGSSIZE; i++)
 		    setsignal(psh, sigs[i], 0);
@@ -252,6 +246,7 @@ state4:	/* XXX ??? - why isn't this before the "if" statement */
 	}
 	exitshell(psh, psh->exitstatus);
 	/* NOTREACHED */
+	return 1;
 }
 
 
@@ -434,7 +429,7 @@ exitcmd(struct shinstance *psh, int argc, char **argv)
 
 
 STATIC const char *
-strip_argv0(const char *argv0, unsigned *lenp)
+strip_argv0(const char *argv0, size_t *lenp)
 {
 	const char *tmp;
 
@@ -446,14 +441,14 @@ strip_argv0(const char *argv0, unsigned *lenp)
 	tmp = strrchr(argv0, '.');
 	if (!tmp)
 		tmp = strchr(argv0, '\0');
-	*lenp = (unsigned)(tmp - argv0);
+	*lenp = tmp - argv0;
 	return argv0;
 }
 
 STATIC int
 usage(const char *argv0)
 {
-	unsigned len;
+	size_t len;
 	argv0 = strip_argv0(argv0, &len);
 
 	fprintf(stdout,
@@ -472,7 +467,7 @@ usage(const char *argv0)
 STATIC int
 version(const char *argv0)
 {
-	unsigned len;
+	size_t len;
 	strip_argv0(argv0, &len);
 
 	fprintf(stdout,

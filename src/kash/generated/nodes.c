@@ -48,7 +48,6 @@
 #include "memalloc.h"
 #include "machdep.h"
 #include "mystring.h"
-#include "shinstance.h"
 
 
 int     funcblocksize;		/* size of structures in function */
@@ -99,8 +98,7 @@ STATIC char *nodesavestr(char *);
  */
 
 union node *
-copyfunc(psh, n)
-    struct shinstance *psh;
+copyfunc(n)
 	union node *n;
 {
 	if (n == NULL)
@@ -108,7 +106,7 @@ copyfunc(psh, n)
 	funcblocksize = 0;
 	funcstringsize = 0;
 	calcsize(n);
-	funcblock = ckmalloc(psh, funcblocksize + funcstringsize);
+	funcblock = ckmalloc(funcblocksize + funcstringsize);
 	funcstring = (char *) funcblock + funcblocksize;
 	return copynode(n);
 }
@@ -341,10 +339,9 @@ nodesavestr(s)
  */
 
 void
-freefunc(psh, n)
-    shinstance *psh;
+freefunc(n)
 	union node *n;
 {
 	if (n)
-		ckfree(psh, n);
+		ckfree(n);
 }
