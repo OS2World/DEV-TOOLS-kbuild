@@ -115,8 +115,8 @@ STATIC int readtoken(shinstance *);
 STATIC int xxreadtoken(shinstance *);
 STATIC int readtoken1(shinstance *, int, char const *, char *, int);
 STATIC int noexpand(shinstance *, char *);
-SH_NORETURN_1 STATIC void synexpect(shinstance *, int) SH_NORETURN_2;
-SH_NORETURN_1 STATIC void synerror(shinstance *, const char *) SH_NORETURN_2;
+STATIC void synexpect(shinstance *, int) __attribute__((__noreturn__));
+STATIC void synerror(shinstance *, const char *) __attribute__((__noreturn__));
 STATIC void setprompt(shinstance *, int);
 
 
@@ -1150,7 +1150,7 @@ endword:
 	grabstackblock(psh, len);
 	psh->wordtext = out;
 	if (dblquotep != NULL)
-	    ckfree(psh, dblquotep);
+	    ckfree(dblquotep);
 	return psh->lasttoken = TWORD;
 /* end of readtoken routine */
 
@@ -1345,8 +1345,8 @@ badsub:			synerror(psh, "Bad substitution");
 		*(stackblock(psh) + typeloc) = subtype | flags;
 		if (subtype != VSNORMAL) {
 			varnest++;
-			if (varnest >= (int)maxnest) {
-				dblquotep = ckrealloc(psh, dblquotep, maxnest / 8);
+			if (varnest >= maxnest) {
+				dblquotep = ckrealloc(dblquotep, maxnest / 8);
 				dblquotep[(maxnest / 32) - 1] = 0;
 				maxnest += 32;
 			}
@@ -1379,7 +1379,7 @@ parsebackq: {
 	savepbq = psh->parsebackquote;
 	if (setjmp(jmploc.loc)) {
 		if (str)
-			ckfree(psh, str);
+			ckfree(str);
 		psh->parsebackquote = 0;
 		psh->handler = savehandler;
 		longjmp(psh->handler->loc, 1);
@@ -1388,7 +1388,7 @@ parsebackq: {
 	str = NULL;
 	savelen = (int)(out - stackblock(psh));
 	if (savelen > 0) {
-		str = ckmalloc(psh, savelen);
+		str = ckmalloc(savelen);
 		memcpy(str, stackblock(psh), savelen);
 	}
 	savehandler = psh->handler;
@@ -1494,7 +1494,7 @@ done:
 		memcpy(out, str, savelen);
 		STADJUST(psh, savelen, out);
 		INTOFF;
-		ckfree(psh, str);
+		ckfree(str);
 		str = NULL;
 		INTON;
 	}
@@ -1595,7 +1595,7 @@ goodname(const char *name)
  * occur at this point.
  */
 
-SH_NORETURN_1 STATIC void
+STATIC void
 synexpect(shinstance *psh, int token)
 {
 	char msg[64];
@@ -1611,7 +1611,7 @@ synexpect(shinstance *psh, int token)
 }
 
 
-SH_NORETURN_1 STATIC void
+STATIC void
 synerror(shinstance *psh, const char *msg)
 {
 	if (psh->commandname)

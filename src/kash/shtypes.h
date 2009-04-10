@@ -36,6 +36,7 @@
 #endif
 
 #ifdef _MSC_VER
+# include <io.h> /* intptr_t and uintptr_t */
 typedef signed char     int8_t;
 typedef unsigned char   uint8_t;
 typedef short           int16_t;
@@ -44,12 +45,6 @@ typedef int             int32_t;
 typedef unsigned int    uint32_t;
 typedef _int64          int64_t;
 typedef unsigned _int64 uint64_t;
-# if _MSC_VER >= 1400
-#  include <io.h> /* intptr_t and uintptr_t */
-# else
-typedef KIPTR           intptr_t;
-typedef KUPTR           uintptr_t;
-# endif
 
 #define INT16_C(c)      (c)
 #define INT32_C(c)      (c)
@@ -116,16 +111,6 @@ typedef struct shsigaction
     shsigset_t  sh_mask;
     int         sh_flags;
 } shsigaction_t;
-
-/* SH_NORETURN_1 must be both on prototypes and definitions, while
-   SH_NORETURN_2 should at least be on the prototype. */
-#ifdef _MSC_VER
-# define SH_NORETURN_1 __declspec(noreturn)
-# define SH_NORETURN_2
-#else
-# define SH_NORETURN_1
-# define SH_NORETURN_2 __attribute__((__noreturn__))
-#endif
 
 #endif
 

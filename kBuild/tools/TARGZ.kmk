@@ -32,6 +32,47 @@
 #
 
 TOOL_TARGZ := tar.gz unpacker.
-TOOL_TARGZ_EXTENDS = TAR
+
+# Tool Specific Properties
+ifndef TOOL_TARGZ_TAR
+ TOOL_TARGZ_TAR := $(wildcard $(PATH_DEVTOOLS_BLD)/tar/v*/tar$(HOSTSUFF_EXE))
+ ifeq ($(TOOL_TARGZ_TAR),)
+  TOOL_TARGZ_TAR := $(wildcard $(PATH_DEVTOOLS_BLD)/bin/tar$(HOSTSUFF_EXE))
+ endif
+ ifeq ($(TOOL_TARGZ_TAR),)
+  TOOL_TARGZ_TAR := $(TOOL_TAR_TAR)
+ endif
+ ifeq ($(TOOL_TARGZ_TAR),)
+  TOOL_TARGZ_TAR := $(lastword $(sort $(TOOL_TARGZ_TAR)))
+ else
+  TOOL_TARGZ_TAR := tar$(HOSTSUFF_EXE)
+ endif
+else
+ TOOL_TARGZ_TAR := $(TOOL_TARGZ_TAR)
+endif
+TOOL_TARGZ_UNPACK ?= $(TOOL_TARGZ_TAR)
+
+# General Properties used by kBuild
 TOOL_TARGZ_UNPACKFLAGS ?= -z
+
+## UNPACK one file.
+# @param    $(target)   Normalized main target name.
+# @param    $(archive)  The file to unpack.
+# @param    $(flags)    Flags.
+# @param	$(inst)		Where to unpack it.
+# @param	$(out)		Where to write the file list.
+TOOL_TARGZ_UNPACK_OUTPUT =
+TOOL_TARGZ_UNPACK_DEPEND =
+TOOL_TARGZ_UNPACK_DEPORD =
+ifeq ($(KBUILD_HOST),win) # hacking with buggy unxutils on windows. it doesn't like driver letters.
+define TOOL_TARGZ_UNPACK_CMDS
+	$(QUIET)$(TOOL_TARGZ_UNPACK) -x $(flags) -C $(subst G:,,$(inst)) -f $(archive)
+	$(QUIET)$(TOOL_TARGZ_UNPACK) -t $(flags) -f $(archive) > $(out)
+endef
+else
+define TOOL_TARGZ_UNPACK_CMDS
+	$(QUIET)$(TOOL_TARGZ_UNPACK) -x $(flags) -C $(inst) -f $(archive)
+	$(QUIET)$(TOOL_TARGZ_UNPACK) -t $(flags) -f $(archive) > $(out)
+endef
+endif
 
