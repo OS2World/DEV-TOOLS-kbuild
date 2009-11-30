@@ -68,7 +68,6 @@ kmk_SOURCES =	ar.c arscan.c commands.c default.c dir.c expand.c file.c \
 		kmkbuiltin/expr.c \
 		kmkbuiltin/install.c \
 		kmkbuiltin/kDepIDB.c \
-		kmkbuiltin/kDepObj.c \
 		kmkbuiltin/ln.c \
 		kmkbuiltin/md5sum.c \
 		kmkbuiltin/mkdir.c \
@@ -161,7 +160,7 @@ DEFS = \
 	-DKBUILD_SVN_REV=1 \
 	-DKBUILD_VERSION_MAJOR=0 \
 	-DKBUILD_VERSION_MINOR=1 \
-	-DKBUILD_VERSION_PATCH=98 \
+	-DKBUILD_VERSION_PATCH=5 \
 	\
 	-DCONFIG_WITH_KMK_BUILTIN \
     @DEFS@

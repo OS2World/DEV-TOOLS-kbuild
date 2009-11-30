@@ -55,13 +55,13 @@ __RCSID("$NetBSD: memalloc.c,v 1.28 2003/08/07 09:05:34 agc Exp $");
  */
 
 pointer
-ckmalloc(shinstance *psh, size_t nbytes)
+ckmalloc(size_t nbytes)
 {
 	pointer p;
 
-	p = sh_malloc(psh, nbytes);
+	p = malloc(nbytes);
 	if (p == NULL)
-		error(psh, "Out of space");
+		error(NULL, "Out of space");
 	return p;
 }
 
@@ -71,11 +71,11 @@ ckmalloc(shinstance *psh, size_t nbytes)
  */
 
 pointer
-ckrealloc(struct shinstance *psh, pointer p, size_t nbytes)
+ckrealloc(pointer p, size_t nbytes)
 {
-	p = sh_realloc(psh, p, nbytes);
+	p = realloc(p, nbytes);
 	if (p == NULL)
-		error(psh, "Out of space");
+		error(NULL, "Out of space");
 	return p;
 }
 
@@ -85,13 +85,12 @@ ckrealloc(struct shinstance *psh, pointer p, size_t nbytes)
  */
 
 char *
-savestr(struct shinstance *psh, const char *s)
+savestr(const char *s)
 {
 	char *p;
-    size_t len = strlen(s);
 
-	p = ckmalloc(psh, len + 1);
-	memcpy(p, s, len + 1);
+	p = ckmalloc(strlen(s) + 1);
+	scopy(s, p);
 	return p;
 }
 
@@ -126,7 +125,7 @@ stalloc(shinstance *psh, size_t nbytes)
 	char *p;
 
 	nbytes = SHELL_ALIGN(nbytes);
-	if (nbytes > (size_t)psh->stacknleft || psh->stacknleft < 0) {
+	if (nbytes > psh->stacknleft) {
 		size_t blocksize;
 		struct stack_block *sp;
 
@@ -134,7 +133,7 @@ stalloc(shinstance *psh, size_t nbytes)
 		if (blocksize < MINSIZE)
 			blocksize = MINSIZE;
 		INTOFF;
-		sp = ckmalloc(psh, sizeof(struct stack_block) - MINSIZE + blocksize);
+		sp = ckmalloc(sizeof(struct stack_block) - MINSIZE + blocksize);
 		sp->prev = psh->stackp;
 		psh->stacknxt = sp->space;
 		psh->stacknleft = (int)blocksize;
@@ -182,7 +181,7 @@ popstackmark(shinstance *psh, struct stackmark *mark)
 	while (psh->stackp != mark->stackp) {
 		sp = psh->stackp;
 		psh->stackp = sp->prev;
-		ckfree(psh, sp);
+		ckfree(sp);
 	}
 	psh->stacknxt = mark->stacknxt;
 	psh->stacknleft = mark->stacknleft;
@@ -214,7 +213,7 @@ growstackblock(shinstance *psh)
 		oldstackp = psh->stackp;
 		sp = psh->stackp;
 		psh->stackp = sp->prev;
-		sp = ckrealloc(psh, (pointer)sp,
+		sp = ckrealloc((pointer)sp,
 		    sizeof(struct stack_block) - MINSIZE + newlen);
 		sp->prev = psh->stackp;
 		psh->stackp = sp;

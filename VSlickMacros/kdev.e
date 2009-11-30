@@ -69,7 +69,7 @@ def  'C-S-M' = k_javadoc_moduleheader
 def  'C-S-O' = k_oneliner
 def  'C-S-P' = k_mark_modified_line
 def  'C-S-S' = k_box_structs
-def  'C-S-T' = k_rebuild_tagfile
+def  'C-S-T' = odin32_maketagfile
 def  'C-S-L' = k_style_load
 
 //optional stuff
@@ -184,22 +184,10 @@ static boolean k_commentconfig(_str &sLeft, _str &sRight, int &iColumn, _str sEx
     if (sLexer)
     {
         /* multiline */
-#if __VERSION__>=14.0
-        _str aComments[];
-        GetComments(aComments, "mlcomment", sLexer)
-        for (i = 0; i < aComments._length(); i++)
-            if (!pos("documentation", aComments[i]) > 0)
-            {
-                sLine = aComments[i];
-                break;
-            }
-        if (sLine != '')
-#else
         rc = _ini_get_value(slick_path_search("user.vlx"), sLexer, 'mlcomment', sLine);
         if (rc)
             rc = _ini_get_value(slick_path_search("vslick.vlx"), sLexer, 'mlcomment', sLine);
         if (!rc)
-#endif
         {
             sLeft  = strip(word(sLine, 1));
             sRight = strip(word(sLine, 2));
@@ -208,21 +196,10 @@ static boolean k_commentconfig(_str &sLeft, _str &sRight, int &iColumn, _str sEx
         }
 
         /* failed, try single line. */
-#if __VERSION__>=14.0
-        GetComments(aComments, "linecomment", sLexer)
-        for (i = 0; i < aComments._length(); i++)
-            if (!pos("documentation", aComments[i]) > 0)
-            {
-                sLine = aComments[i];
-                break;
-            }
-        if (sLine != '')
-#else
         rc = _ini_get_value(slick_path_search("user.vlx"), sLexer, 'linecomment', sLine);
         if (rc)
             rc = _ini_get_value(slick_path_search("vslick.vlx"), sLexer, 'linecomment', sLine);
         if (!rc)
-#endif
         {
             sLeft = strip(word(sLine, 1));
             sRight = '';
@@ -1194,7 +1171,6 @@ void k_javadoc_funcbox()
     _str    sArgs = "";
     int     iCursorLine;
     int     iPadd = k_alignup(11, p_SyntaxIndent);
-
     /* look for parameters */
     boolean fFoundFn = !k_func_goto_nearest_function();
     if (fFoundFn)
@@ -1219,13 +1195,11 @@ void k_javadoc_funcbox()
         for (i = 0; i < cArgs; i++)
         {
             _str sName, sType, sDefault;
-            if (   !k_func_enumparams(sArgs, i, sType, sName, sDefault)
+            if (!k_func_enumparams(sArgs, i, sType, sName, sDefault)
                 && iPadd2 < length(sName))
                 iPadd2 = length(sName);
         }
         iPadd2 = k_alignup((iPadd + iPadd2), p_SyntaxIndent);
-        if (iPadd2 < 28)
-            iPadd2 = k_alignup(28, p_SyntaxIndent);
 
         /*
          * Insert parameter.
@@ -1235,7 +1209,7 @@ void k_javadoc_funcbox()
             _str sName, sType, sDefault;
             if (!k_func_enumparams(sArgs, i, sType, sName, sDefault))
             {
-                _str sStr3 = '.';
+                _str sStr3 = '';
                 if (sDefault != "")
                     sStr3 = '(default='sDefault')';
                 k_javadoc_box_line('@param', iPadd, sName, iPadd2, sStr3);
@@ -1969,22 +1943,33 @@ static void klib_klog_file_int(boolean fAsk)
     }
 }
 
-/** @todo move to kkeys.e */
-_command void k_rebuild_tagfile()
+
+/*******************************************************************************
+*   Odin32 backward compatibility                                              *
+*******************************************************************************/
+_command void odin32_maketagfile()
 {
-#if 1 /*__VERSION__ < 14.0*/
+    /* We'll */
     if (file_match('-p 'maybe_quote_filename(strip_filename(_project_name,'e'):+TAG_FILE_EXT),1) != "")
-        _project_update_files_retag(false, false, false, false);
+    {
+        _project_update_files_retag(false,false,false,false);
+        /*
+        RetagFilesInTagFile2(project_tag_file, orig_view_id, temp_view_id, rebuild_all, false,
+                             doRemove,false,true,true);*/
+    }
     else
-        _project_update_files_retag(true,  false, false, true);
-#else
-    _str sArgs = "-refs=on";
-    if (file_match('-p 'maybe_quote_filename(strip_filename(_project_name,'e'):+TAG_FILE_EXT),1) != "")
-        sArgs = sArgs :+ " -retag";
-    sArgs = sArgs :+ " " :+ _workspace_filename;
-    build_workspace_tagfiles(sArgs);
-#endif
+        _project_update_files_retag(true,false,false,true);
 }
+
+_command void odin32_setcurrentdir()
+{
+    //_ini_get_value(_project_name,"COMPILER","WORKINGDIR", workingdir);
+    //cd(workingdir);
+    /* Go the the directory containing the project filename */
+    cd(strip_filename(_project_name, 'NE'));
+}
+
+
 
 
 /*******************************************************************************
@@ -2743,7 +2728,6 @@ static int k_style_emacs_var(_str sVar, _str sVal)
 
         case 'nuke-trailing-whitespace-p':
         {
-#if 0
             _str sName = 'def-koptions-'p_buf_id;
             int idx = insert_name(sName, MISC_TYPE, "kstyledoc");
             if (!idx)
@@ -2756,7 +2740,6 @@ static int k_style_emacs_var(_str sVar, _str sVal)
                     set_name_info(idx, "saveoptions: -S");
                 say 'sVal=' sVal;
             }
-#endif
             break;
         }
 
@@ -2889,17 +2872,12 @@ void k_style_load()
 void _buffer_add_kdev(int buf_id)
 {
     _str sName = 'def-koptions-'buf_id;
-    int idx = find_index(sName, MISC_TYPE);
+    int idx = insert_name(sName, MISC_TYPE, "kstyledoc");
+    if (!idx)
+        idx = find_index(sName, MISC_TYPE);
     if (idx)
-        delete_name(idx);
-    //message("_buffer_add_kdev: " idx " name=" sName);
-
-    sName = 'def-kstyledoc-'buf_id;
-    idx = find_index(sName, MISC_TYPE);
-    if (idx)
-        delete_name(idx);
-
-    //k_style_load();
+        set_name_info(idx, "");
+    //message("_buffer_add_kdev: " idx);
 }
 
 
@@ -3337,9 +3315,9 @@ btnCancel.lbutton_up()
 definit()
 {
     /* do cleanup. */
-    for (i = 0; i < 999; i++)
+    for (i = 0; i < 200; i++)
     {
-        index = name_match("def-koptions-", 1 /*find_first*/, MISC_TYPE);
+        index = name_match("def-koptions-", 1, MISC_TYPE);
         if (!index)
             break;
         delete_name(index);

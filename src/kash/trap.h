@@ -43,4 +43,4 @@ void ignoresig(struct shinstance *, int, int);
 void onsig(struct shinstance *, int);
 void dotrap(struct shinstance *);
 void setinteractive(struct shinstance *, int);
-SH_NORETURN_1 void exitshell(struct shinstance *, int) SH_NORETURN_2;
+void exitshell(struct shinstance *, int) __attribute__((__noreturn__));
